@@ -96,6 +96,9 @@ func TestCmdGuidePrintsBootstrapGuidance(t *testing.T) {
 	if !strings.Contains(got, "AGENTS.md") || !strings.Contains(got, ".agents") {
 		t.Fatalf("guide output missing repo instructions: %q", got)
 	}
+	if !strings.Contains(got, "bb task new <title>") {
+		t.Fatalf("guide output missing task creation hint: %q", got)
+	}
 }
 
 func TestRunGuidePrintsBootstrapGuidance(t *testing.T) {
@@ -120,6 +123,21 @@ func TestRunUnknownCommandSuggestsNextAction(t *testing.T) {
 	}
 	if !strings.Contains(exitErr.Message, "Try 'bb help'") {
 		t.Fatalf("error message = %q, want help suggestion", exitErr.Message)
+	}
+}
+
+func TestRunHelpPrintsTaskCreationHint(t *testing.T) {
+	out := &bytes.Buffer{}
+	restoreIO := setCLIIO(t, strings.NewReader(""), out)
+	defer restoreIO()
+
+	if err := Run(nil); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	got := out.String()
+	if !strings.Contains(got, "bb task new <title>") {
+		t.Fatalf("help output = %q, want task creation hint", got)
 	}
 }
 

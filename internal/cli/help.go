@@ -44,6 +44,7 @@ func renderGeneralHelp() string {
 	b.WriteString("   12  lock conflict (CAS failure)\n\n")
 	b.WriteString("All writes require --based-on <revision> (Compare-and-Swap).\n")
 	b.WriteString("For command details, run 'bb help <command>'.\n")
+	b.WriteString("Before other work, add a task with 'bb task new <title>'.\n")
 	b.WriteString("For agents and automation, prefer explicit init flags over interactive prompts.\n")
 	return b.String()
 }
