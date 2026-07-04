@@ -1,0 +1,13 @@
+version: 1
+project:
+  id: blackboard
+  name: blackboard
+context:
+  files:
+    - README.md
+    - AGENTS.md
+    - CLAUDE.md
+commands:
+  test: ""
+  lint: ""
+  typecheck: ""

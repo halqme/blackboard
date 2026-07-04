@@ -1,0 +1,7 @@
+interface:
+  display_name: "Blackboard Bootstrap"
+  short_description: "Bring blackboard workflow into a repository"
+  default_prompt: "Use $blackboard to bootstrap blackboard workflow into this repository."
+
+policy:
+  allow_implicit_invocation: true
