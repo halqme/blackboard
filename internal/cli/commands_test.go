@@ -27,9 +27,7 @@ func TestCmdInitWithAgentFilesCreatesWorkflowDocsAndInstallsSkills(t *testing.T)
 	}
 
 	assertFileContains(t, filepath.Join(wd, "AGENTS.md"), "## Blackboard")
-	assertFileContains(t, filepath.Join(wd, "CLAUDE.md"), "$blackboard")
-	assertFileContains(t, filepath.Join(wd, ".agent", "skills", "blackboard", "SKILL.md"), "Mandatory skill for repositories adopting blackboard workflow.")
-	assertFileContains(t, filepath.Join(wd, ".claude", "skills", "blackboard", "SKILL.md"), "Mandatory skill for repositories adopting blackboard workflow.")
+	assertFileContains(t, filepath.Join(wd, ".agents", "skills", "blackboard", "SKILL.md"), "Mandatory skill for repositories adopting blackboard workflow.")
 }
 
 func TestCmdInitWithoutAgentFilesSkipsWorkflowDocsAndSkillInstall(t *testing.T) {
@@ -51,14 +49,8 @@ func TestCmdInitWithoutAgentFilesSkipsWorkflowDocsAndSkillInstall(t *testing.T) 
 	if _, err := os.Stat(filepath.Join(wd, "AGENTS.md")); !os.IsNotExist(err) {
 		t.Fatalf("AGENTS.md exists, want not exist; err=%v", err)
 	}
-	if _, err := os.Stat(filepath.Join(wd, "CLAUDE.md")); !os.IsNotExist(err) {
-		t.Fatalf("CLAUDE.md exists, want not exist; err=%v", err)
-	}
-	if _, err := os.Stat(filepath.Join(wd, ".agent")); !os.IsNotExist(err) {
-		t.Fatalf(".agent exists, want not exist; err=%v", err)
-	}
-	if _, err := os.Stat(filepath.Join(wd, ".claude")); !os.IsNotExist(err) {
-		t.Fatalf(".claude exists, want not exist; err=%v", err)
+	if _, err := os.Stat(filepath.Join(wd, ".agents")); !os.IsNotExist(err) {
+		t.Fatalf(".agents exists, want not exist; err=%v", err)
 	}
 }
 
@@ -82,7 +74,7 @@ func TestCmdInitInteractiveYesCreatesWorkflowDocsAndInstallsSkills(t *testing.T)
 	}
 
 	assertFileContains(t, filepath.Join(wd, "AGENTS.md"), "## Blackboard")
-	assertFileContains(t, filepath.Join(wd, ".agent", "skills", "blackboard", "SKILL.md"), "Mandatory skill for repositories adopting blackboard workflow.")
+	assertFileContains(t, filepath.Join(wd, ".agents", "skills", "blackboard", "SKILL.md"), "Mandatory skill for repositories adopting blackboard workflow.")
 }
 
 func TestCmdGuidePrintsBootstrapGuidance(t *testing.T) {
@@ -98,11 +90,11 @@ func TestCmdGuidePrintsBootstrapGuidance(t *testing.T) {
 	if !strings.Contains(got, "blackboard.yaml") {
 		t.Fatalf("guide output missing blackboard.yaml: %q", got)
 	}
-	if !strings.Contains(got, ".agent") {
-		t.Fatalf("guide output missing .agent: %q", got)
+	if !strings.Contains(got, ".agents") {
+		t.Fatalf("guide output missing .agents: %q", got)
 	}
-	if !strings.Contains(got, "Use --with-agent-files") {
-		t.Fatalf("guide output missing flag recommendation: %q", got)
+	if !strings.Contains(got, "AGENTS.md") || !strings.Contains(got, ".agents") {
+		t.Fatalf("guide output missing repo instructions: %q", got)
 	}
 }
 
@@ -212,15 +204,61 @@ func TestRunNestedHelpPrintsSubcommandUsage(t *testing.T) {
 	}
 }
 
+func TestRootCommandsAreDeclaredByCommandFunctions(t *testing.T) {
+	commands := rootCommands()
+
+	if findCommand(commands, "task") == nil {
+		t.Fatalf("rootCommands() missing task command")
+	}
+	if findCommand(commands, "artifact") == nil {
+		t.Fatalf("rootCommands() missing artifact command")
+	}
+}
+
+func TestParentCommandsRegisterSubcommandDeclarations(t *testing.T) {
+	task := taskCommand()
+	child := findCommand(task.Children, "new")
+	if child == nil {
+		t.Fatalf("taskCommand() missing new subcommand")
+	}
+	if child.Run == nil {
+		t.Fatalf("task new command missing Run")
+	}
+	if child.Usage != "bb task new <title>" {
+		t.Fatalf("task new usage = %q, want %q", child.Usage, "bb task new <title>")
+	}
+
+	artifact := artifactCommand()
+	if findCommand(artifact.Children, "list") == nil {
+		t.Fatalf("artifactCommand() missing list subcommand")
+	}
+}
+
+func TestIntermediateCommandsAreHelpOnly(t *testing.T) {
+	for _, command := range rootCommands() {
+		assertIntermediateCommandsHaveNoRun(t, []string{command.Name}, command)
+	}
+}
+
+func assertIntermediateCommandsHaveNoRun(t *testing.T, path []string, command Command) {
+	t.Helper()
+	if len(command.Children) > 0 && command.Run != nil {
+		t.Fatalf("intermediate command %q must not have Run", strings.Join(path, " "))
+	}
+	for _, child := range command.Children {
+		assertIntermediateCommandsHaveNoRun(t, append(path, child.Name), child)
+	}
+}
+
 func TestCommandCatalogLeafCommandsHaveHelp(t *testing.T) {
-	for _, spec := range commandCatalog {
-		assertCommandHelpCoverage(t, []string{spec.Name}, spec)
+	for _, command := range rootCommands() {
+		assertCommandHelpCoverage(t, []string{command.Name}, command)
 	}
 }
 
 func TestCommandCatalogLeafCommandsRespondToHelp(t *testing.T) {
-	for _, spec := range commandCatalog {
-		assertLeafHelpRuns(t, []string{spec.Name}, spec)
+	for _, command := range rootCommands() {
+		assertLeafHelpRuns(t, []string{command.Name}, command)
 	}
 }
 
@@ -474,31 +512,28 @@ func assertExitError(t *testing.T, err error, wantCode int) ExitError {
 	return exitErr
 }
 
-func assertCommandHelpCoverage(t *testing.T, path []string, spec commandSpec) {
+func assertCommandHelpCoverage(t *testing.T, path []string, command Command) {
 	t.Helper()
-	if len(spec.Subcommands) == 0 {
-		if len(spec.Usage) == 0 {
-			t.Fatalf("command %q missing usage", strings.Join(path, " "))
-		}
-		if strings.TrimSpace(spec.Help) == "" {
-			t.Fatalf("command %q missing help", strings.Join(path, " "))
+	if strings.TrimSpace(command.Abstract) == "" {
+		t.Fatalf("command %q missing abstract", strings.Join(path, " "))
+	}
+	if strings.TrimSpace(command.Usage) == "" {
+		t.Fatalf("command %q missing usage", strings.Join(path, " "))
+	}
+	if len(command.Children) == 0 {
+		if command.Run == nil {
+			t.Fatalf("leaf command %q missing Run", strings.Join(path, " "))
 		}
 		return
 	}
-	if len(spec.Usage) == 0 {
-		t.Fatalf("command %q missing usage", strings.Join(path, " "))
-	}
-	if strings.TrimSpace(spec.Help) == "" {
-		t.Fatalf("command %q missing help", strings.Join(path, " "))
-	}
-	for _, child := range spec.Subcommands {
+	for _, child := range command.Children {
 		assertCommandHelpCoverage(t, append(path, child.Name), child)
 	}
 }
 
-func assertLeafHelpRuns(t *testing.T, path []string, spec commandSpec) {
+func assertLeafHelpRuns(t *testing.T, path []string, command Command) {
 	t.Helper()
-	if len(spec.Subcommands) == 0 {
+	if len(command.Children) == 0 {
 		out := &bytes.Buffer{}
 		restoreIO := setCLIIO(t, strings.NewReader(""), out)
 		defer restoreIO()
@@ -512,7 +547,7 @@ func assertLeafHelpRuns(t *testing.T, path []string, spec commandSpec) {
 		}
 		return
 	}
-	for _, child := range spec.Subcommands {
+	for _, child := range command.Children {
 		assertLeafHelpRuns(t, append(path, child.Name), child)
 	}
 }

@@ -14,167 +14,80 @@ import (
 	"github.com/halqme/blackboard/internal/store"
 )
 
-type commandSpec struct {
-	Name        string
-	Summary     string
-	Usage       []string
-	Help        string
-	Run         func(args []string) error
-	Subcommands []commandSpec
+type Command struct {
+	Name     string
+	Usage    string
+	Abstract string
+	Run      func(args []string) error
+	Children []Command
 }
 
-var commandCatalog = []commandSpec{
-	{
-		Name:    "init",
-		Summary: "Initialize a new blackboard project",
-		Usage: []string{
-			"bb init [--with-agent-files|--no-agent-files]",
-		},
-		Help: "Create blackboard.yaml and initialize the project store.",
-		Run:  cmdInit,
-	},
-	{
-		Name:    "guide",
-		Summary: "Show blackboard rollout guidance for repos and agents",
-		Usage: []string{
-			"bb guide",
-		},
-		Help: "Explain how to roll blackboard into a repository and agent setup.",
-		Run:  cmdGuide,
-	},
-	{
-		Name:    "status",
-		Summary: "Show current workflow state",
-		Usage: []string{
-			"bb status [--json]",
-		},
-		Help: "Show the current revision, active task, and stage.",
-		Run: func(args []string) error {
-			return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
-				return cmdStatus(args, st)
-			})
-		},
-	},
-	{
-		Name:    "task",
-		Summary: "Task operations",
-		Usage: []string{
-			"bb task <subcommand>",
-		},
-		Help: "Operate on tasks.",
-		Subcommands: []commandSpec{
-			{
-				Name:    "new",
-				Summary: "Create a new task",
-				Usage: []string{
-					"bb task new <title>",
-				},
-				Help: "Create a new task and pause any currently active task.",
-				Run: func(args []string) error {
-					return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
-						return cmdTaskNew(args, s, st)
-					})
-				},
-			},
-		},
-	},
-	{
-		Name:    "next",
-		Summary: "Show the next valid stage or action",
-		Usage: []string{
-			"bb next [--json]",
-		},
-		Help: "Show the current stage and the next valid stage transition.",
-		Run: func(args []string) error {
-			return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
-				return cmdNext(args, st)
-			})
-		},
-	},
-	{
-		Name:    "context",
-		Summary: "Show working context (project, task, artifacts)",
-		Usage: []string{
-			"bb context [--json]",
-		},
-		Help: "Render the current project context for a human or agent.",
-		Run: func(args []string) error {
-			return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
-				return cmdContext(args, root, cfg, st)
-			})
-		},
-	},
-	{
-		Name:    "stage",
-		Summary: "Show stage-specific instructions",
-		Usage: []string{
-			"bb stage <stage>",
-		},
-		Help: "Show instructions for one workflow stage.",
-		Run:  cmdStage,
-	},
-	{
-		Name:    "submit",
-		Summary: "Submit an artifact (proposal, impl, etc.)",
-		Usage: []string{
-			"bb submit <kind> --file <path> --based-on <revision>",
-		},
-		Help: "Submit an artifact and optionally advance the task stage.",
-		Run: func(args []string) error {
-			return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
-				return cmdSubmit(args, s, st)
-			})
-		},
-	},
-	{
-		Name:    "artifact",
-		Summary: "Artifact operations",
-		Usage: []string{
-			"bb artifact <subcommand>",
-		},
-		Help: "Inspect project artifacts.",
-		Subcommands: []commandSpec{
-			{
-				Name:    "list",
-				Summary: "List all artifacts",
-				Usage: []string{
-					"bb artifact list [--json]",
-				},
-				Help: "Inspect recorded artifacts for the current project.",
-				Run: func(args []string) error {
-					return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
-						return cmdArtifactList(args, s, st)
-					})
-				},
-			},
-		},
-	},
-	{
-		Name:    "approve",
-		Summary: "Approve an artifact",
-		Usage: []string{
-			"bb approve <artifact-id> --based-on <revision>",
-		},
-		Help: "Mark an artifact as approved using CAS semantics.",
-		Run: func(args []string) error {
-			return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
-				return cmdApprove(args, s, st)
-			})
-		},
-	},
-	{
-		Name:    "archive",
-		Summary: "Archive the current task",
-		Usage: []string{
-			"bb archive --based-on <revision>",
-		},
-		Help: "Archive the active task using CAS semantics.",
-		Run: func(args []string) error {
-			return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
-				return cmdArchive(args, s, st)
-			})
-		},
-	},
+func rootCommands() []Command {
+	return []Command{
+		initCommand(),
+		guideCommand(),
+		statusCommand(),
+		taskCommand(),
+		nextCommand(),
+		contextCommand(),
+		stageCommand(),
+		submitCommand(),
+		artifactCommand(),
+		approveCommand(),
+		archiveCommand(),
+	}
+}
+
+func initCommand() Command {
+	return Command{Name: "init", Usage: "bb init [--with-agent-files|--no-agent-files]", Abstract: "Initialize a new blackboard project", Run: cmdInit}
+}
+
+func guideCommand() Command {
+	return Command{Name: "guide", Usage: "bb guide", Abstract: "Show blackboard rollout guidance for repos and agents", Run: cmdGuide}
+}
+
+func statusCommand() Command {
+	return Command{Name: "status", Usage: "bb status [--json]", Abstract: "Show current workflow state", Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmdStatus(args, st) }) }}
+}
+
+func taskCommand() Command {
+	return Command{Name: "task", Usage: "bb task <subcommand>", Abstract: "Task operations; use 'bb task new' to add a task before other work", Children: []Command{taskNewCommand()}}
+}
+
+func taskNewCommand() Command {
+	return Command{Name: "new", Usage: "bb task new <title>", Abstract: "Create a new task", Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmdTaskNew(args, s, st) }) }}
+}
+
+func nextCommand() Command {
+	return Command{Name: "next", Usage: "bb next [--json]", Abstract: "Show the next valid stage or action", Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmdNext(args, st) }) }}
+}
+
+func contextCommand() Command {
+	return Command{Name: "context", Usage: "bb context [--json]", Abstract: "Show working context (project, task, artifacts)", Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmdContext(args, root, cfg, st) }) }}
+}
+
+func stageCommand() Command {
+	return Command{Name: "stage", Usage: "bb stage <stage>", Abstract: "Show stage-specific instructions", Run: cmdStage}
+}
+
+func submitCommand() Command {
+	return Command{Name: "submit", Usage: "bb submit <kind> --file <path> --based-on <revision>", Abstract: "Submit an artifact (proposal, impl, etc.)", Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmdSubmit(args, s, st) }) }}
+}
+
+func artifactCommand() Command {
+	return Command{Name: "artifact", Usage: "bb artifact <subcommand>", Abstract: "Artifact operations", Children: []Command{artifactListCommand()}}
+}
+
+func artifactListCommand() Command {
+	return Command{Name: "list", Usage: "bb artifact list [--json]", Abstract: "List all artifacts", Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmdArtifactList(args, s, st) }) }}
+}
+
+func approveCommand() Command {
+	return Command{Name: "approve", Usage: "bb approve <artifact-id> --based-on <revision>", Abstract: "Approve an artifact", Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmdApprove(args, s, st) }) }}
+}
+
+func archiveCommand() Command {
+	return Command{Name: "archive", Usage: "bb archive --based-on <revision>", Abstract: "Archive the current task", Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmdArchive(args, s, st) }) }}
 }
 
 // ── init ────────────────────────────────────────────────────────────────
@@ -227,10 +140,10 @@ func cmdGuide(_ []string) error {
 	fmt.Fprint(cliOut, `Blackboard rollout guide
 
 1. Run 'bb init' inside the target repository.
-2. Add or update repo instructions in AGENTS.md.
-3. Install the blackboard skill into .agents when agent files are enabled.
-4. Teach agents to use the repo workflow through those files, not through hidden prompts.
-5. Use --with-agent-files for agents and automation to skip the interactive prompt.
+2. If you are Claude and do not consult AGENTS.md or .agents/, check them first.
+3. Add or update repo instructions in AGENTS.md.
+4. Install the blackboard skill into .agents when agent files are enabled.
+5. Add a task first with 'bb task new <title>' before continuing work.
 6. Use 'bb help' as the source of truth for command shape.
 
 Files involved:

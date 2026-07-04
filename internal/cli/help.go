@@ -11,12 +11,12 @@ func cmdHelp(args []string) error {
 		return nil
 	}
 
-	spec, path := resolveCommandPath(commandCatalog, args)
-	if spec == nil {
+	command, path := resolveCommandPath(rootCommands(), args)
+	if command == nil {
 		return usage(unknownCommandMessage(args[0]))
 	}
 
-	fmt.Fprint(cliOut, renderCommandHelp(*spec, path))
+	fmt.Fprint(cliOut, renderCommandHelp(*command, path))
 	return nil
 }
 
@@ -26,8 +26,8 @@ func renderGeneralHelp() string {
 	b.WriteString("Usage:\n")
 	b.WriteString("  bb <command> [options]\n\n")
 	b.WriteString("Commands:\n")
-	for _, spec := range commandCatalog {
-		b.WriteString(fmt.Sprintf("  %-30s %s\n", compactUsage(spec), spec.Summary))
+	for _, command := range rootCommands() {
+		b.WriteString(fmt.Sprintf("  %-30s %s\n", compactUsage(command), command.Abstract))
 	}
 	b.WriteString("  help, --help, -h              Show usage information\n\n")
 	b.WriteString("Stages:\n")
@@ -48,30 +48,24 @@ func renderGeneralHelp() string {
 	return b.String()
 }
 
-func renderCommandHelp(spec commandSpec, path []string) string {
+func renderCommandHelp(command Command, path []string) string {
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf("bb %s\n\n", strings.Join(path, " ")))
 	b.WriteString("Usage:\n")
-	for _, line := range spec.Usage {
-		b.WriteString("  " + line + "\n")
-	}
-	b.WriteString("\n")
-	b.WriteString(spec.Help + "\n")
-	if len(spec.Subcommands) > 0 {
+	b.WriteString("  " + command.Usage + "\n\n")
+	b.WriteString(command.Abstract + "\n")
+	if len(command.Children) > 0 {
 		b.WriteString("\nSubcommands:\n")
-		for _, child := range spec.Subcommands {
-			b.WriteString(fmt.Sprintf("  %-30s %s\n", child.Name, child.Summary))
+		for _, child := range command.Children {
+			b.WriteString(fmt.Sprintf("  %-30s %s\n", child.Name, child.Abstract))
 		}
 		b.WriteString(fmt.Sprintf("\nTry 'bb help %s <subcommand>' for details.\n", strings.Join(path, " ")))
 	}
 	return b.String()
 }
 
-func compactUsage(spec commandSpec) string {
-	if len(spec.Usage) == 0 {
-		return spec.Name
-	}
-	return strings.TrimPrefix(spec.Usage[0], "bb ")
+func compactUsage(command Command) string {
+	return strings.TrimPrefix(command.Usage, "bb ")
 }
 
 func unknownCommandMessage(name string) string {
@@ -83,26 +77,26 @@ func commandUsage(path []string, problem string) error {
 	return usage(problem + "\n\nNext action:\n  - " + next)
 }
 
-func resolveCommandPath(specs []commandSpec, args []string) (*commandSpec, []string) {
+func resolveCommandPath(commands []Command, args []string) (*Command, []string) {
 	var path []string
-	current := specs
-	var spec *commandSpec
+	current := commands
+	var command *Command
 	for _, arg := range args {
-		next := findSubcommand(current, arg)
+		next := findCommand(current, arg)
 		if next == nil {
 			break
 		}
-		spec = next
+		command = next
 		path = append(path, next.Name)
-		current = next.Subcommands
+		current = next.Children
 	}
-	return spec, path
+	return command, path
 }
 
-func findSubcommand(specs []commandSpec, name string) *commandSpec {
-	for i := range specs {
-		if specs[i].Name == name {
-			return &specs[i]
+func findCommand(commands []Command, name string) *Command {
+	for i := range commands {
+		if commands[i].Name == name {
+			return &commands[i]
 		}
 	}
 	return nil

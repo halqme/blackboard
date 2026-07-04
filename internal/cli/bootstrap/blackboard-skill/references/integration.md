@@ -10,7 +10,7 @@ There are three layers, and each has a different job:
    Teaches the agent how to bring blackboard into a repository.
 2. Agent-side hook
    Nudges the agent to check whether bootstrap is needed.
-3. Repo-local `AGENTS.md` and `CLAUDE.md`
+3. Repo-local `AGENTS.md`
    Carry the durable workflow rules for that repository.
 
 If you skip repo-local files, the setup gets brittle fast.

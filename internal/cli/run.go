@@ -13,19 +13,19 @@ func Run(args []string) error {
 		return cmdHelp(args[1:])
 	}
 
-	spec := findSubcommand(commandCatalog, args[0])
-	if spec == nil {
+	command := findCommand(rootCommands(), args[0])
+	if command == nil {
 		return usage(unknownCommandMessage(args[0]))
 	}
-	return runCommand(spec, []string{spec.Name}, args[1:])
+	return runCommand(command, []string{command.Name}, args[1:])
 }
 
-func runCommand(spec *commandSpec, path, args []string) error {
-	if len(spec.Subcommands) > 0 {
+func runCommand(command *Command, path, args []string) error {
+	if len(command.Children) > 0 {
 		if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
 			return cmdHelp(path)
 		}
-		child := findSubcommand(spec.Subcommands, args[0])
+		child := findCommand(command.Children, args[0])
 		if child == nil {
 			return commandUsage(path, "unknown subcommand: "+args[0])
 		}
@@ -34,10 +34,10 @@ func runCommand(spec *commandSpec, path, args []string) error {
 	if has(args, "--help") || has(args, "-h") {
 		return cmdHelp(path)
 	}
-	if spec.Run == nil {
-		return commandUsage(path, "usage: "+spec.Usage[0])
+	if command.Run == nil {
+		return commandUsage(path, "usage: "+command.Usage)
 	}
-	return spec.Run(args)
+	return command.Run(args)
 }
 
 func withProject(fn func(root string, cfg config.Config, s store.Store, st store.State) error) error {

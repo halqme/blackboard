@@ -15,7 +15,7 @@ This skill should stay thin. Do not turn it into a second CLI manual.
 2. Tell the agent to use `bb help` for current command shape.
 3. Explain the split between:
    - `bb` as the source of command truth
-   - repo-local `AGENTS.md` and `CLAUDE.md` as durable workflow instructions
+   - repo-local `AGENTS.md` as durable workflow instructions
    - agent-side hooks as optional nudges
 
 If `bb` and the skill disagree, `bb` wins. The skill is not authoritative.
@@ -27,7 +27,7 @@ When introducing blackboard into another repository:
 1. Run `bb guide`.
 2. Run `bb init`.
 3. Prefer `bb init --with-agent-files` for agents and automation.
-4. Review the generated or updated `AGENTS.md` and `CLAUDE.md`.
+4. Review the generated or updated `AGENTS.md`. 
 5. Keep repo-specific rules in those files, not in this skill.
 
 ## Boundaries
