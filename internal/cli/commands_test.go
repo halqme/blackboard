@@ -7,220 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/halqme/blackboard/internal/cli/commandkit"
 	"github.com/halqme/blackboard/internal/store"
 )
-
-func TestCmdInitWithAgentFilesCreatesWorkflowDocsAndInstallsSkills(t *testing.T) {
-	t.Setenv("BLACKBOARD_HOME", t.TempDir())
-	wd := t.TempDir()
-	prev, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() error = %v", err)
-	}
-	if err := os.Chdir(wd); err != nil {
-		t.Fatalf("Chdir() error = %v", err)
-	}
-	defer os.Chdir(prev)
-
-	if err := cmdInit([]string{"--with-agent-files"}); err != nil {
-		t.Fatalf("cmdInit() error = %v", err)
-	}
-
-	assertFileContains(t, filepath.Join(wd, "AGENTS.md"), "## Blackboard")
-	assertFileContains(t, filepath.Join(wd, ".agents", "skills", "blackboard", "SKILL.md"), "Mandatory skill for repositories adopting blackboard workflow.")
-}
-
-func TestCmdInitWithoutAgentFilesSkipsWorkflowDocsAndSkillInstall(t *testing.T) {
-	t.Setenv("BLACKBOARD_HOME", t.TempDir())
-	wd := t.TempDir()
-	prev, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() error = %v", err)
-	}
-	if err := os.Chdir(wd); err != nil {
-		t.Fatalf("Chdir() error = %v", err)
-	}
-	defer os.Chdir(prev)
-
-	if err := cmdInit([]string{"--no-agent-files"}); err != nil {
-		t.Fatalf("cmdInit() error = %v", err)
-	}
-
-	if _, err := os.Stat(filepath.Join(wd, "AGENTS.md")); !os.IsNotExist(err) {
-		t.Fatalf("AGENTS.md exists, want not exist; err=%v", err)
-	}
-	if _, err := os.Stat(filepath.Join(wd, ".agents")); !os.IsNotExist(err) {
-		t.Fatalf(".agents exists, want not exist; err=%v", err)
-	}
-}
-
-func TestCmdInitInteractiveYesCreatesWorkflowDocsAndInstallsSkills(t *testing.T) {
-	t.Setenv("BLACKBOARD_HOME", t.TempDir())
-	wd := t.TempDir()
-	prev, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() error = %v", err)
-	}
-	if err := os.Chdir(wd); err != nil {
-		t.Fatalf("Chdir() error = %v", err)
-	}
-	defer os.Chdir(prev)
-
-	restoreIO := setCLIIO(t, strings.NewReader("y\n"), &bytes.Buffer{})
-	defer restoreIO()
-
-	if err := cmdInit(nil); err != nil {
-		t.Fatalf("cmdInit() error = %v", err)
-	}
-
-	assertFileContains(t, filepath.Join(wd, "AGENTS.md"), "## Blackboard")
-	assertFileContains(t, filepath.Join(wd, ".agents", "skills", "blackboard", "SKILL.md"), "Mandatory skill for repositories adopting blackboard workflow.")
-}
-
-func TestCmdGuidePrintsBootstrapGuidance(t *testing.T) {
-	out := &bytes.Buffer{}
-	restoreIO := setCLIIO(t, strings.NewReader(""), out)
-	defer restoreIO()
-
-	if err := cmdGuide(nil); err != nil {
-		t.Fatalf("cmdGuide() error = %v", err)
-	}
-
-	got := out.String()
-	if !strings.Contains(got, "blackboard.yaml") {
-		t.Fatalf("guide output missing blackboard.yaml: %q", got)
-	}
-	if !strings.Contains(got, ".agents") {
-		t.Fatalf("guide output missing .agents: %q", got)
-	}
-	if !strings.Contains(got, "AGENTS.md") || !strings.Contains(got, ".agents") {
-		t.Fatalf("guide output missing repo instructions: %q", got)
-	}
-	if !strings.Contains(got, "bb task new <title>") {
-		t.Fatalf("guide output missing task creation hint: %q", got)
-	}
-}
-
-func TestRunGuidePrintsBootstrapGuidance(t *testing.T) {
-	out := &bytes.Buffer{}
-	restoreIO := setCLIIO(t, strings.NewReader(""), out)
-	defer restoreIO()
-
-	if err := Run([]string{"guide"}); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-
-	if !strings.Contains(out.String(), "Blackboard rollout guide") {
-		t.Fatalf("Run(guide) output = %q, want rollout guide", out.String())
-	}
-}
-
-func TestRunUnknownCommandSuggestsNextAction(t *testing.T) {
-	err := Run([]string{"--version"})
-	exitErr := assertExitError(t, err, 2)
-	if !strings.Contains(exitErr.Message, "unknown command: --version") {
-		t.Fatalf("error message = %q, want unknown command", exitErr.Message)
-	}
-	if !strings.Contains(exitErr.Message, "Try 'bb help'") {
-		t.Fatalf("error message = %q, want help suggestion", exitErr.Message)
-	}
-}
-
-func TestRunHelpPrintsTaskCreationHint(t *testing.T) {
-	out := &bytes.Buffer{}
-	restoreIO := setCLIIO(t, strings.NewReader(""), out)
-	defer restoreIO()
-
-	if err := Run(nil); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-
-	got := out.String()
-	if !strings.Contains(got, "bb task new <title>") {
-		t.Fatalf("help output = %q, want task creation hint", got)
-	}
-}
-
-func TestRunHelpForCommandPrintsCommandSpecificUsage(t *testing.T) {
-	out := &bytes.Buffer{}
-	restoreIO := setCLIIO(t, strings.NewReader(""), out)
-	defer restoreIO()
-
-	if err := Run([]string{"help", "task"}); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-
-	got := out.String()
-	if !strings.Contains(got, "Usage:\n  bb task <subcommand>") {
-		t.Fatalf("help output = %q, want parent task usage", got)
-	}
-	if !strings.Contains(got, "Subcommands:") || !strings.Contains(got, "new") {
-		t.Fatalf("help output = %q, want task subcommands", got)
-	}
-}
-
-func TestRunCommandHelpFlagPrintsCommandSpecificUsage(t *testing.T) {
-	out := &bytes.Buffer{}
-	restoreIO := setCLIIO(t, strings.NewReader(""), out)
-	defer restoreIO()
-
-	if err := Run([]string{"task", "--help"}); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-
-	got := out.String()
-	if !strings.Contains(got, "Usage:\n  bb task <subcommand>") {
-		t.Fatalf("help output = %q, want parent task usage", got)
-	}
-}
-
-func TestRunNestedCommandHelpFlagPrintsLeafUsage(t *testing.T) {
-	out := &bytes.Buffer{}
-	restoreIO := setCLIIO(t, strings.NewReader(""), out)
-	defer restoreIO()
-
-	if err := Run([]string{"task", "new", "--help"}); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-
-	got := out.String()
-	if !strings.Contains(got, "Usage:\n  bb task new <title>") {
-		t.Fatalf("help output = %q, want leaf task usage", got)
-	}
-}
-
-func TestRunParentHelpListsSubcommands(t *testing.T) {
-	out := &bytes.Buffer{}
-	restoreIO := setCLIIO(t, strings.NewReader(""), out)
-	defer restoreIO()
-
-	if err := Run([]string{"help", "artifact"}); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-
-	got := out.String()
-	if !strings.Contains(got, "Subcommands:") {
-		t.Fatalf("help output = %q, want subcommand section", got)
-	}
-	if !strings.Contains(got, "list") {
-		t.Fatalf("help output = %q, want artifact list subcommand", got)
-	}
-}
-
-func TestRunNestedHelpPrintsSubcommandUsage(t *testing.T) {
-	out := &bytes.Buffer{}
-	restoreIO := setCLIIO(t, strings.NewReader(""), out)
-	defer restoreIO()
-
-	if err := Run([]string{"help", "artifact", "list"}); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-
-	got := out.String()
-	if !strings.Contains(got, "Usage:\n  bb artifact list [--json]") {
-		t.Fatalf("help output = %q, want nested subcommand usage", got)
-	}
-}
 
 func TestRootCommandsAreDeclaredByCommandFunctions(t *testing.T) {
 	commands := rootCommands()
@@ -258,16 +47,6 @@ func TestIntermediateCommandsAreHelpOnly(t *testing.T) {
 	}
 }
 
-func assertIntermediateCommandsHaveNoRun(t *testing.T, path []string, command Command) {
-	t.Helper()
-	if len(command.Children) > 0 && command.Run != nil {
-		t.Fatalf("intermediate command %q must not have Run", strings.Join(path, " "))
-	}
-	for _, child := range command.Children {
-		assertIntermediateCommandsHaveNoRun(t, append(path, child.Name), child)
-	}
-}
-
 func TestCommandCatalogLeafCommandsHaveHelp(t *testing.T) {
 	for _, command := range rootCommands() {
 		assertCommandHelpCoverage(t, []string{command.Name}, command)
@@ -280,176 +59,11 @@ func TestCommandCatalogLeafCommandsRespondToHelp(t *testing.T) {
 	}
 }
 
-func TestCmdTaskCreatesTaskAndPausesPreviousActiveTask(t *testing.T) {
-	s := newTestStore(t)
-	st := store.State{
-		ProjectID: "proj1",
-		Revision:  1,
-		Tasks: []store.Task{{
-			ID:        "task-old",
-			Title:     "old task",
-			Stage:     "intake",
-			Status:    "active",
-			CreatedAt: "2026-07-04T00:00:00Z",
-			UpdatedAt: "2026-07-04T00:00:00Z",
-		}},
-	}
-	if err := s.Save(st); err != nil {
-		t.Fatalf("Save() error = %v", err)
-	}
-
-	if err := cmdTaskNew([]string{"new", "task"}, s, st); err != nil {
-		t.Fatalf("cmdTaskNew() error = %v", err)
-	}
-
-	got, err := s.Load()
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-	if got.Revision != 2 {
-		t.Fatalf("revision = %d, want 2", got.Revision)
-	}
-	if len(got.Tasks) != 2 {
-		t.Fatalf("tasks len = %d, want 2", len(got.Tasks))
-	}
-	if got.Tasks[0].Status != "paused" {
-		t.Fatalf("old task status = %q, want paused", got.Tasks[0].Status)
-	}
-	if got.Tasks[1].Title != "new task" || got.Tasks[1].Status != "active" {
-		t.Fatalf("new task = %+v, want active new task", got.Tasks[1])
-	}
-}
-
-func TestCmdSubmitStoresArtifactAndAdvancesTaskStage(t *testing.T) {
-	s := newTestStore(t)
-	blobPath := filepath.Join(t.TempDir(), "proposal.txt")
-	if err := os.WriteFile(blobPath, []byte("proposal body"), 0o644); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
-	}
-	st := store.State{
-		ProjectID: "proj1",
-		Revision:  1,
-		Tasks: []store.Task{{
-			ID:        "task-1",
-			Title:     "task",
-			Stage:     "intake",
-			Status:    "active",
-			CreatedAt: "2026-07-04T00:00:00Z",
-			UpdatedAt: "2026-07-04T00:00:00Z",
-		}},
-	}
-	if err := s.Save(st); err != nil {
-		t.Fatalf("Save() error = %v", err)
-	}
-
-	if err := cmdSubmit([]string{"proposal", "--file", blobPath, "--based-on", "v1"}, s, st); err != nil {
-		t.Fatalf("cmdSubmit() error = %v", err)
-	}
-
-	got, err := s.Load()
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-	if got.Revision != 2 {
-		t.Fatalf("revision = %d, want 2", got.Revision)
-	}
-	if got.Tasks[0].Stage != "proposal" {
-		t.Fatalf("task stage = %q, want proposal", got.Tasks[0].Stage)
-	}
-	if len(got.Artifacts) != 1 {
-		t.Fatalf("artifacts len = %d, want 1", len(got.Artifacts))
-	}
-	if got.Artifacts[0].Status != "active" || got.Artifacts[0].Kind != "proposal" {
-		t.Fatalf("artifact = %+v, want active proposal", got.Artifacts[0])
-	}
-}
-
-func TestCmdApproveMarksArtifactApproved(t *testing.T) {
-	s := newTestStore(t)
-	st := store.State{
-		ProjectID: "proj1",
-		Revision:  1,
-		Tasks: []store.Task{{
-			ID:        "task-1",
-			Title:     "task",
-			Stage:     "proposal",
-			Status:    "active",
-			CreatedAt: "2026-07-04T00:00:00Z",
-			UpdatedAt: "2026-07-04T00:00:00Z",
-		}},
-		Artifacts: []store.Artifact{{
-			ID:              "art-1",
-			TaskID:          "task-1",
-			Stage:           "proposal",
-			Kind:            "proposal",
-			Version:         1,
-			Status:          "active",
-			BlobHash:        "abc123",
-			BasedOnRevision: 1,
-			CreatedAt:       "2026-07-04T00:00:00Z",
-		}},
-	}
-	if err := s.Save(st); err != nil {
-		t.Fatalf("Save() error = %v", err)
-	}
-
-	if err := cmdApprove([]string{"art-1", "--based-on", "v1"}, s, st); err != nil {
-		t.Fatalf("cmdApprove() error = %v", err)
-	}
-
-	got, err := s.Load()
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-	if got.Revision != 2 {
-		t.Fatalf("revision = %d, want 2", got.Revision)
-	}
-	if got.Artifacts[0].Status != "approved" {
-		t.Fatalf("artifact status = %q, want approved", got.Artifacts[0].Status)
-	}
-}
-
-func TestCmdArchiveMarksTaskArchived(t *testing.T) {
-	s := newTestStore(t)
-	st := store.State{
-		ProjectID: "proj1",
-		Revision:  1,
-		Tasks: []store.Task{{
-			ID:        "task-1",
-			Title:     "task",
-			Stage:     "proposal",
-			Status:    "active",
-			CreatedAt: "2026-07-04T00:00:00Z",
-			UpdatedAt: "2026-07-04T00:00:00Z",
-		}},
-	}
-	if err := s.Save(st); err != nil {
-		t.Fatalf("Save() error = %v", err)
-	}
-
-	if err := cmdArchive([]string{"--based-on", "v1"}, s, st); err != nil {
-		t.Fatalf("cmdArchive() error = %v", err)
-	}
-
-	got, err := s.Load()
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-	if got.Revision != 2 {
-		t.Fatalf("revision = %d, want 2", got.Revision)
-	}
-	if got.Tasks[0].Stage != "archived" || got.Tasks[0].Status != "archived" {
-		t.Fatalf("task = %+v, want archived", got.Tasks[0])
-	}
-}
-
 func TestRunTaskUsesProjectConfigAndStore(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("BLACKBOARD_HOME", home)
-
 	wd := t.TempDir()
 	writeTestProject(t, wd, "proj1")
-
 	prev, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd() error = %v", err)
@@ -458,11 +72,9 @@ func TestRunTaskUsesProjectConfigAndStore(t *testing.T) {
 		t.Fatalf("Chdir() error = %v", err)
 	}
 	defer os.Chdir(prev)
-
 	if err := Run([]string{"task", "new", "via run"}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
-
 	s := store.New("proj1")
 	got, err := s.Load()
 	if err != nil {
@@ -470,6 +82,16 @@ func TestRunTaskUsesProjectConfigAndStore(t *testing.T) {
 	}
 	if got.Revision != 2 || len(got.Tasks) != 1 || got.Tasks[0].Title != "via run" {
 		t.Fatalf("state = %+v, want one task from Run", got)
+	}
+}
+
+func assertIntermediateCommandsHaveNoRun(t *testing.T, path []string, command Command) {
+	t.Helper()
+	if len(command.Children) > 0 && command.Run != nil {
+		t.Fatalf("intermediate command %q must not have Run", strings.Join(path, " "))
+	}
+	for _, child := range command.Children {
+		assertIntermediateCommandsHaveNoRun(t, append(path, child.Name), child)
 	}
 }
 
@@ -505,13 +127,13 @@ func assertFileContains(t *testing.T, path, want string) {
 
 func setCLIIO(t *testing.T, in *strings.Reader, out *bytes.Buffer) func() {
 	t.Helper()
-	prevIn := cliIn
-	prevOut := cliOut
-	cliIn = in
-	cliOut = out
+	prevIn := commandkit.In
+	prevOut := commandkit.Out
+	commandkit.In = in
+	commandkit.Out = out
 	return func() {
-		cliIn = prevIn
-		cliOut = prevOut
+		commandkit.In = prevIn
+		commandkit.Out = prevOut
 	}
 }
 

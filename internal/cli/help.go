@@ -3,20 +3,22 @@ package cli
 import (
 	"fmt"
 	"strings"
+
+	"github.com/halqme/blackboard/internal/cli/commandkit"
 )
 
 func cmdHelp(args []string) error {
 	if len(args) == 0 {
-		fmt.Fprint(cliOut, renderGeneralHelp())
+		fmt.Fprint(commandkit.Out, renderGeneralHelp())
 		return nil
 	}
 
 	command, path := resolveCommandPath(rootCommands(), args)
 	if command == nil {
-		return usage(unknownCommandMessage(args[0]))
+		return commandkit.Usage(unknownCommandMessage(args[0]))
 	}
 
-	fmt.Fprint(cliOut, renderCommandHelp(*command, path))
+	fmt.Fprint(commandkit.Out, renderCommandHelp(*command, path))
 	return nil
 }
 
@@ -44,7 +46,6 @@ func renderGeneralHelp() string {
 	b.WriteString("   12  lock conflict (CAS failure)\n\n")
 	b.WriteString("All writes require --based-on <revision> (Compare-and-Swap).\n")
 	b.WriteString("For command details, run 'bb help <command>'.\n")
-	b.WriteString("Before other work, add a task with 'bb task new <title>'.\n")
 	b.WriteString("For agents and automation, prefer explicit init flags over interactive prompts.\n")
 	return b.String()
 }
@@ -69,18 +70,9 @@ func compactUsage(command Command) string {
 	return strings.TrimPrefix(command.Usage, "bb ")
 }
 
-func unknownCommandMessage(name string) string {
-	return fmt.Sprintf("unknown command: %s\n\nNext actions:\n  - Try 'bb help' to list available commands.\n  - Try 'bb help <command>' for command-specific usage.", name)
-}
-
-func commandUsage(path []string, problem string) error {
-	next := fmt.Sprintf("Try 'bb help %s' for command usage.", strings.Join(path, " "))
-	return usage(problem + "\n\nNext action:\n  - " + next)
-}
-
-func resolveCommandPath(commands []Command, args []string) (*Command, []string) {
+func resolveCommandPath(commandsList []Command, args []string) (*Command, []string) {
 	var path []string
-	current := commands
+	current := commandsList
 	var command *Command
 	for _, arg := range args {
 		next := findCommand(current, arg)
@@ -101,4 +93,13 @@ func findCommand(commands []Command, name string) *Command {
 		}
 	}
 	return nil
+}
+
+func unknownCommandMessage(name string) string {
+	return fmt.Sprintf("unknown command: %s\n\nNext actions:\n  - Try 'bb help' to list available commands.\n  - Try 'bb help <command>' for command-specific usage.", name)
+}
+
+func commandUsage(path []string, problem string) error {
+	next := fmt.Sprintf("Try 'bb help %s' for command usage.", strings.Join(path, " "))
+	return commandkit.Usage(problem + "\n\nNext action:\n  - " + next)
 }

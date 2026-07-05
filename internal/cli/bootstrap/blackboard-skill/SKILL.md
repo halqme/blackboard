@@ -46,4 +46,4 @@ Hooks should not mutate workflow state automatically.
 
 ## References
 
-- For integration guidance and hook wording, read [references/integration.md](references/integration.md).
+- For integration guidance and hook wording, read [references/integration.md](./references/integration.md).

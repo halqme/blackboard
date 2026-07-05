@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"github.com/halqme/blackboard/internal/cli/commandkit"
 	"github.com/halqme/blackboard/internal/config"
 	"github.com/halqme/blackboard/internal/store"
 )
@@ -12,10 +13,13 @@ func Run(args []string) error {
 	if args[0] == "--help" || args[0] == "-h" || args[0] == "help" {
 		return cmdHelp(args[1:])
 	}
+	if args[0] == "--version" {
+		return cmdVersion(nil)
+	}
 
 	command := findCommand(rootCommands(), args[0])
 	if command == nil {
-		return usage(unknownCommandMessage(args[0]))
+		return commandkit.Usage(unknownCommandMessage(args[0]))
 	}
 	return runCommand(command, []string{command.Name}, args[1:])
 }
@@ -31,7 +35,7 @@ func runCommand(command *Command, path, args []string) error {
 		}
 		return runCommand(child, append(path, child.Name), args[1:])
 	}
-	if has(args, "--help") || has(args, "-h") {
+	if commandkit.Has(args, "--help") || commandkit.Has(args, "-h") {
 		return cmdHelp(path)
 	}
 	if command.Run == nil {
@@ -43,11 +47,11 @@ func runCommand(command *Command, path, args []string) error {
 func withProject(fn func(root string, cfg config.Config, s store.Store, st store.State) error) error {
 	root, err := config.FindRoot(".")
 	if err != nil {
-		return configErr(err.Error())
+		return commandkit.ConfigErr(err.Error())
 	}
 	cfg, err := config.Load(root)
 	if err != nil {
-		return configErr(err.Error())
+		return commandkit.ConfigErr(err.Error())
 	}
 	s := store.New(cfg.Project.ID)
 	if err := s.Ensure(); err != nil {
