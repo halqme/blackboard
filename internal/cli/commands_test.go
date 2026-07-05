@@ -39,6 +39,9 @@ func TestParentCommandsRegisterSubcommandDeclarations(t *testing.T) {
 	if findCommand(artifact.Children, "list") == nil {
 		t.Fatalf("artifactCommand() missing list subcommand")
 	}
+	if findCommand(rootCommands(), "write-config") == nil {
+		t.Fatalf("rootCommands() missing write-config command")
+	}
 }
 
 func TestIntermediateCommandsAreHelpOnly(t *testing.T) {

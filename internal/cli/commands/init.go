@@ -2,9 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/halqme/blackboard/internal/cli/commandkit"
 	"github.com/halqme/blackboard/internal/config"
@@ -12,36 +9,18 @@ import (
 )
 
 func CmdInit(args []string) error {
-	if _, err := os.Stat("blackboard.yaml"); err == nil {
-		return commandkit.ConfigErr("blackboard.yaml already exists")
-	}
 	writeAgentFiles, err := shouldWriteAgentFiles(args)
 	if err != nil {
 		return err
 	}
-	wd, _ := os.Getwd()
-	id := strings.ToLower(strings.ReplaceAll(filepath.Base(wd), " ", "-"))
-	content := fmt.Sprintf(`version: 1
-project:
-  id: %s
-  name: %s
-context:
-  files:
-    - README.md
-    - AGENTS.md
-commands:
-  test: ""
-  lint: ""
-  typecheck: ""
-`, id, filepath.Base(wd))
-	if err := os.WriteFile("blackboard.yaml", []byte(content), 0o644); err != nil {
+	if err := CmdWriteConfig(nil); err != nil {
 		return err
 	}
 	if writeAgentFiles {
-		if err := ensureAgentWorkflowFiles(); err != nil {
+		if err := CmdWriteAgentFiles(nil); err != nil {
 			return err
 		}
-		if err := installAgentSkills(); err != nil {
+		if err := CmdInstallSkill(nil); err != nil {
 			return err
 		}
 	}

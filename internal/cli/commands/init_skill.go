@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -10,6 +11,36 @@ import (
 	"github.com/halqme/blackboard/internal/cli/commandkit"
 )
 
+func CmdWriteConfig(_ []string) error {
+	if _, err := os.Stat("blackboard.yaml"); err == nil {
+		return commandkit.ConfigErr("blackboard.yaml already exists")
+	}
+	wd, _ := os.Getwd()
+	id := strings.ToLower(strings.ReplaceAll(filepath.Base(wd), " ", "-"))
+	content := fmt.Sprintf(`version: 1
+project:
+  id: %s
+  name: %s
+context:
+  files:
+    - README.md
+    - AGENTS.md
+commands:
+  test: ""
+  lint: ""
+  typecheck: ""
+`, id, filepath.Base(wd))
+	return os.WriteFile("blackboard.yaml", []byte(content), 0o644)
+}
+
+func CmdWriteAgentFiles(_ []string) error {
+	return ensureAgentWorkflowFile("AGENTS.md", agentsWorkflowSnippet)
+}
+
+func CmdInstallSkill(_ []string) error {
+	return writeInstalledSkill(filepath.Join(".agents", "skills", "blackboard"))
+}
+
 func shouldWriteAgentFiles(args []string) (bool, error) {
 	if commandkit.Has(args, "--with-agent-files") {
 		return true, nil
@@ -18,14 +49,6 @@ func shouldWriteAgentFiles(args []string) (bool, error) {
 		return false, nil
 	}
 	return commandkit.PromptYesNo("Add blackboard workflow guidance to AGENTS.md?")
-}
-
-func ensureAgentWorkflowFiles() error {
-	return ensureAgentWorkflowFile("AGENTS.md", agentsWorkflowSnippet)
-}
-
-func installAgentSkills() error {
-	return writeInstalledSkill(filepath.Join(".agents", "skills", "blackboard"))
 }
 
 func ensureAgentWorkflowFile(path, snippet string) error {

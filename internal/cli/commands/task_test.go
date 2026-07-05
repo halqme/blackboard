@@ -6,6 +6,22 @@ import (
 	"github.com/halqme/blackboard/internal/store"
 )
 
+func TestPauseActiveTaskPausesCurrentTask(t *testing.T) {
+	st := store.State{Tasks: []store.Task{{ID: "task-old", Status: "active", UpdatedAt: "2026-07-04T00:00:00Z"}}}
+	pauseActiveTask(&st)
+	if st.Tasks[0].Status != "paused" {
+		t.Fatalf("status = %q, want paused", st.Tasks[0].Status)
+	}
+}
+
+func TestCreateTaskAppendsActiveTask(t *testing.T) {
+	st := store.State{}
+	task := createTask(&st, "new task")
+	if len(st.Tasks) != 1 || task.Title != "new task" || st.Tasks[0].Status != "active" {
+		t.Fatalf("state = %+v task = %+v", st, task)
+	}
+}
+
 func TestCmdTaskCreatesTaskAndPausesPreviousActiveTask(t *testing.T) {
 	s := newTestStore(t)
 	st := store.State{ProjectID: "proj1", Revision: 1, Tasks: []store.Task{{ID: "task-old", Title: "old task", Stage: "intake", Status: "active", CreatedAt: "2026-07-04T00:00:00Z", UpdatedAt: "2026-07-04T00:00:00Z"}}}

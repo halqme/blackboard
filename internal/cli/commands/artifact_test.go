@@ -8,6 +8,37 @@ import (
 	"github.com/halqme/blackboard/internal/store"
 )
 
+func TestValidateSubmitArgsParsesInputs(t *testing.T) {
+	kind, file, err := validateSubmitArgs([]string{"proposal", "--file", "x.md", "--based-on", "v1"})
+	if err != nil || kind != "proposal" || file != "x.md" {
+		t.Fatalf("kind=%q file=%q err=%v", kind, file, err)
+	}
+}
+
+func TestStoreArtifactAppendsArtifact(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "proposal.txt")
+	if err := os.WriteFile(file, []byte("proposal body"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	st := store.State{Revision: 1, Tasks: []store.Task{{ID: "task-1", Stage: "intake", Status: "active"}}}
+	art, err := storeArtifact(&st, "proposal", file)
+	if err != nil {
+		t.Fatalf("storeArtifact() error = %v", err)
+	}
+	if len(st.Artifacts) != 1 || art.Kind != "proposal" {
+		t.Fatalf("state = %+v art = %+v", st, art)
+	}
+}
+
+func TestAdvanceTaskStageMovesActiveTask(t *testing.T) {
+	st := store.State{Tasks: []store.Task{{ID: "task-1", Stage: "intake", Status: "active"}}}
+	advanceTaskStage(&st, "proposal")
+	if st.Tasks[0].Stage != "proposal" {
+		t.Fatalf("stage = %q, want proposal", st.Tasks[0].Stage)
+	}
+}
+
 func TestCmdSubmitStoresArtifactAndAdvancesTaskStage(t *testing.T) {
 	s := newTestStore(t)
 	blobPath := filepath.Join(t.TempDir(), "proposal.txt")

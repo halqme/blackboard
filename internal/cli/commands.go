@@ -12,6 +12,7 @@ type Command struct {
 	Abstract string
 	Run      func(args []string) error
 	Children []Command
+	Hidden   bool
 }
 
 func rootCommands() []Command {
@@ -19,6 +20,14 @@ func rootCommands() []Command {
 		initCommand(),
 		guideCommand(),
 		versionCommand(),
+		writeConfigCommand(),
+		writeAgentFilesCommand(),
+		installSkillCommand(),
+		pauseActiveTaskCommand(),
+		createTaskCommand(),
+		validateSubmitCommand(),
+		storeArtifactCommand(),
+		advanceTaskStageCommand(),
 		statusCommand(),
 		taskCommand(),
 		nextCommand(),
@@ -81,4 +90,36 @@ func approveCommand() Command {
 
 func archiveCommand() Command {
 	return Command{Name: "archive", Usage: "bb archive --based-on <revision>", Abstract: "Archive the current task", Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmds.CmdArchive(args, s, st) }) }}
+}
+
+func writeConfigCommand() Command {
+	return Command{Name: "write-config", Usage: "bb write-config", Abstract: "Write blackboard.yaml", Run: cmds.CmdWriteConfig, Hidden: true}
+}
+
+func writeAgentFilesCommand() Command {
+	return Command{Name: "write-agent-files", Usage: "bb write-agent-files", Abstract: "Write AGENTS.md blackboard guidance", Run: cmds.CmdWriteAgentFiles, Hidden: true}
+}
+
+func installSkillCommand() Command {
+	return Command{Name: "install-skill", Usage: "bb install-skill", Abstract: "Install blackboard skill into .agents", Run: cmds.CmdInstallSkill, Hidden: true}
+}
+
+func pauseActiveTaskCommand() Command {
+	return Command{Name: "pause-active-task", Usage: "bb pause-active-task", Abstract: "Pause the active task", Hidden: true, Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmds.CmdPauseActiveTask(args, s, st) }) }}
+}
+
+func createTaskCommand() Command {
+	return Command{Name: "create-task", Usage: "bb create-task <title>", Abstract: "Create a task record", Hidden: true, Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmds.CmdCreateTask(args, s, st) }) }}
+}
+
+func validateSubmitCommand() Command {
+	return Command{Name: "validate-submit", Usage: "bb validate-submit <kind> --file <path> --based-on <revision>", Abstract: "Validate submit arguments", Hidden: true, Run: cmds.CmdValidateSubmit}
+}
+
+func storeArtifactCommand() Command {
+	return Command{Name: "store-artifact", Usage: "bb store-artifact <kind> --file <path>", Abstract: "Store an artifact record", Hidden: true, Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmds.CmdStoreArtifact(args, s, st) }) }}
+}
+
+func advanceTaskStageCommand() Command {
+	return Command{Name: "advance-task-stage", Usage: "bb advance-task-stage <stage>", Abstract: "Advance the active task stage", Hidden: true, Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmds.CmdAdvanceTaskStage(args, s, st) }) }}
 }

@@ -8,8 +8,19 @@ import (
 )
 
 func cmdHelp(args []string) error {
+	deep := false
+	filtered := args[:0]
+	for _, arg := range args {
+		if arg == "--deep" {
+			deep = true
+			continue
+		}
+		filtered = append(filtered, arg)
+	}
+	args = filtered
+
 	if len(args) == 0 {
-		fmt.Fprint(commandkit.Out, renderGeneralHelp())
+		fmt.Fprint(commandkit.Out, renderGeneralHelp(deep))
 		return nil
 	}
 
@@ -22,17 +33,23 @@ func cmdHelp(args []string) error {
 	return nil
 }
 
-func renderGeneralHelp() string {
+func renderGeneralHelp(deep bool) string {
 	var b strings.Builder
 	b.WriteString("bb - blackboard multi-agent workflow runtime\n\n")
 	b.WriteString("Usage:\n")
 	b.WriteString("  bb <command> [options]\n\n")
 	b.WriteString("Commands:\n")
 	for _, command := range rootCommands() {
+		if command.Hidden && !deep {
+			continue
+		}
 		b.WriteString(fmt.Sprintf("  %-30s %s\n", compactUsage(command), command.Abstract))
 	}
-	b.WriteString("  help, --help, -h              Show usage information\n\n")
-	b.WriteString("Stages:\n")
+	b.WriteString("  help, --help, -h              Show usage information\n")
+	if !deep {
+		b.WriteString("  help --deep                   Show internal commands too\n")
+	}
+	b.WriteString("\nStages:\n")
 	b.WriteString("  intake context proposal critique decision\n")
 	b.WriteString("  implementation review verification handoff archived\n\n")
 	b.WriteString("Exit codes:\n")

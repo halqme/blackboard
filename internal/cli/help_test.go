@@ -74,6 +74,37 @@ func TestRunUnknownCommandSuggestsNextAction(t *testing.T) {
 	}
 }
 
+func TestRunHelpDoesNotShowInternalCommandsByDefault(t *testing.T) {
+	out := &bytes.Buffer{}
+	restoreIO := setCLIIO(t, strings.NewReader(""), out)
+	defer restoreIO()
+
+	if err := Run([]string{"help"}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	got := out.String()
+	if strings.Contains(got, "write-config") {
+		t.Fatalf("help output = %q, should hide internal commands", got)
+	}
+}
+
+func TestRunHelpDeepShowsInternalCommands(t *testing.T) {
+	out := &bytes.Buffer{}
+	restoreIO := setCLIIO(t, strings.NewReader(""), out)
+	defer restoreIO()
+
+	if err := Run([]string{"help", "--deep"}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	got := out.String()
+	if !strings.Contains(got, "write-config") || !strings.Contains(got, "install-skill") {
+		t.Fatalf("help output = %q, want init internals", got)
+	}
+	if !strings.Contains(got, "pause-active-task") || !strings.Contains(got, "advance-task-stage") {
+		t.Fatalf("help output = %q, want workflow internals", got)
+	}
+}
+
 func TestRunHelpForCommandPrintsCommandSpecificUsage(t *testing.T) {
 	out := &bytes.Buffer{}
 	restoreIO := setCLIIO(t, strings.NewReader(""), out)
