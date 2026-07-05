@@ -29,16 +29,25 @@ Files involved:
 }
 
 func CmdStatus(args []string, st store.State) error {
+	t := currentTask(st)
 	if commandkit.Has(args, "--json") {
-		return commandkit.PrintJSON(st)
+		payload := map[string]any{
+			"project_id":       st.ProjectID,
+			"revision":         fmt.Sprintf("v%d", st.Revision),
+			"task":             t,
+			"has_active_task":  t != nil,
+		}
+		mergeNoTaskGuidance(payload, t == nil)
+		return commandkit.PrintJSON(payload)
 	}
 	fmt.Fprintf(commandkit.Out, "Current revision: v%d\n", st.Revision)
-	if t := currentTask(st); t != nil {
+	if t != nil {
 		fmt.Fprintf(commandkit.Out, "Current task: %s — %s\n", t.ID, t.Title)
 		fmt.Fprintf(commandkit.Out, "Stage: %s\n", t.Stage)
 		fmt.Fprintf(commandkit.Out, "Status: %s\n", t.Status)
 	} else {
 		fmt.Fprintln(commandkit.Out, "Current task: none")
+		printNoTaskGuidance()
 	}
 	return nil
 }
@@ -46,7 +55,21 @@ func CmdStatus(args []string, st store.State) error {
 func CmdNext(args []string, st store.State) error {
 	t := currentTask(st)
 	if t == nil {
-		return commandkit.TaskNotFound("no active task")
+		if commandkit.Has(args, "--json") {
+			return commandkit.PrintJSON(map[string]any{
+				"task_id":      nil,
+				"stage":        nil,
+				"next":         "create-task",
+				"next_command": `bb task new "<title>"`,
+				"revision":     fmt.Sprintf("v%d", st.Revision),
+			})
+		}
+		fmt.Fprintln(commandkit.Out, "No active task.")
+		fmt.Fprintln(commandkit.Out)
+		fmt.Fprintln(commandkit.Out, "You should create a task before proceeding.")
+		fmt.Fprintln(commandkit.Out, "Next command:")
+		fmt.Fprintln(commandkit.Out, `  bb task new "<title>"`)
+		return nil
 	}
 	n := fsm.Next(t.Stage)
 	if n == "" {
@@ -62,9 +85,15 @@ func CmdNext(args []string, st store.State) error {
 func CmdContext(args []string, root string, cfg config.Config, st store.State) error {
 	current := currentTask(st)
 	if commandkit.Has(args, "--json") {
-		return commandkit.PrintJSON(map[string]any{"revision": fmt.Sprintf("v%d", st.Revision), "project": cfg.Project, "task": current, "artifacts": activeArtifacts(st, current)})
+		payload := map[string]any{"revision": fmt.Sprintf("v%d", st.Revision), "project": cfg.Project, "task": current, "artifacts": activeArtifacts(st, current), "has_active_task": current != nil}
+		mergeNoTaskGuidance(payload, current == nil)
+		return commandkit.PrintJSON(payload)
 	}
 	fmt.Fprint(commandkit.Out, bbctx.Render(root, cfg, st, current))
+	if current == nil {
+		fmt.Fprintln(commandkit.Out)
+		printNoTaskGuidance()
+	}
 	return nil
 }
 
@@ -74,4 +103,20 @@ func CmdStage(args []string) error {
 	}
 	fmt.Fprint(commandkit.Out, bbctx.StageInstruction(args[0]))
 	return nil
+}
+
+func printNoTaskGuidance() {
+	fmt.Fprintln(commandkit.Out)
+	fmt.Fprintln(commandkit.Out, "Next action:")
+	fmt.Fprintln(commandkit.Out, "  No active task. Create one before making workflow changes.")
+	fmt.Fprintln(commandkit.Out, "  Example:")
+	fmt.Fprintln(commandkit.Out, `    bb task new "<title>"`)
+}
+
+func mergeNoTaskGuidance(payload map[string]any, noTask bool) {
+	if !noTask {
+		return
+	}
+	payload["next_action"] = "No active task. Create one before making workflow changes."
+	payload["next_command"] = `bb task new "<title>"`
 }
