@@ -9,20 +9,30 @@ import (
 	"github.com/halqme/blackboard/internal/store"
 )
 
-func CmdSubmit(args []string, s store.Store, st store.State) error {
+func CmdSubmit(args []string, s store.Store, _ store.State) error {
 	kind, file, err := validateSubmitArgs(args)
 	if err != nil {
 		return err
 	}
-	art, err := storeArtifact(&st, kind, file)
+	expectedRevision, err := requiredBasedOnRevision(args)
 	if err != nil {
 		return err
 	}
-	advanceTaskStage(&st, kind)
-	st.Revision++
-	if err := s.Save(st); err != nil {
+
+	var art store.Artifact
+	_, err = updateState(s, expectedRevision, func(st *store.State) error {
+		stored, err := storeArtifact(st, kind, file)
+		if err != nil {
+			return err
+		}
+		art = stored
+		advanceTaskStage(st, kind)
+		return nil
+	})
+	if err != nil {
 		return err
 	}
+
 	fmt.Fprintf(commandkit.Out, "submitted %s.%d as %s\n", art.Kind, art.Version, art.ID)
 	return nil
 }
@@ -33,9 +43,11 @@ func validateSubmitArgs(args []string) (kind string, file string, err error) {
 	}
 	kind = args[0]
 	file = commandkit.Value(args, "--file")
-	based := commandkit.Value(args, "--based-on")
-	if file == "" || based == "" {
+	if file == "" || commandkit.Value(args, "--based-on") == "" {
 		return "", "", commandkit.Usage("--file and --based-on are required\n\nNext action:\n  - Try 'bb help submit' for command usage.")
+	}
+	if _, err := requiredBasedOnRevision(args); err != nil {
+		return "", "", err
 	}
 	return kind, file, nil
 }
