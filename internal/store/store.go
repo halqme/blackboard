@@ -103,9 +103,21 @@ func (s Store) Ensure() error {
 		return err
 	}
 	if !existed {
-		return s.Save(State{ProjectID: s.ProjectID, Revision: 1, Tasks: []Task{}, Artifacts: []Artifact{}})
+		return s.initializeState(db)
 	}
 	return nil
+}
+
+func (s Store) initializeState(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := syncStateTx(tx, State{ProjectID: s.ProjectID, Revision: 1}); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s Store) initSchema(db *sql.DB) error {
@@ -186,76 +198,6 @@ func (s Store) Load() (State, error) {
 		st.Artifacts = append(st.Artifacts, a)
 	}
 	return st, nil
-}
-
-func (s Store) Save(st State) error {
-	db, err := s.openDB()
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-	if err := s.initSchema(db); err != nil {
-		return err
-	}
-
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	if _, err := tx.Exec(`
-		INSERT INTO meta(key, value)
-		VALUES ('project_id', ?), ('revision', ?)
-		ON CONFLICT(key) DO UPDATE SET value = excluded.value
-	`, st.ProjectID, fmt.Sprintf("%d", st.Revision)); err != nil {
-		return err
-	}
-
-	taskIDs := make([]string, 0, len(st.Tasks))
-	for _, t := range st.Tasks {
-		taskIDs = append(taskIDs, t.ID)
-		if _, err := tx.Exec(`
-			INSERT INTO tasks(id, title, stage, status, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?)
-			ON CONFLICT(id) DO UPDATE SET
-				title = excluded.title,
-				stage = excluded.stage,
-				status = excluded.status,
-				created_at = excluded.created_at,
-				updated_at = excluded.updated_at
-		`, t.ID, t.Title, t.Stage, t.Status, t.CreatedAt, t.UpdatedAt); err != nil {
-			return err
-		}
-	}
-	if err := deleteMissingRows(tx, "tasks", taskIDs); err != nil {
-		return err
-	}
-
-	artifactIDs := make([]string, 0, len(st.Artifacts))
-	for _, a := range st.Artifacts {
-		artifactIDs = append(artifactIDs, a.ID)
-		if _, err := tx.Exec(`
-			INSERT INTO artifacts(id, task_id, stage, kind, version, status, blob_hash, based_on_revision, created_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-			ON CONFLICT(id) DO UPDATE SET
-				task_id = excluded.task_id,
-				stage = excluded.stage,
-				kind = excluded.kind,
-				version = excluded.version,
-				status = excluded.status,
-				blob_hash = excluded.blob_hash,
-				based_on_revision = excluded.based_on_revision,
-				created_at = excluded.created_at
-		`, a.ID, a.TaskID, a.Stage, a.Kind, a.Version, a.Status, a.BlobHash, a.BasedOnRevision, a.CreatedAt); err != nil {
-			return err
-		}
-	}
-	if err := deleteMissingRows(tx, "artifacts", artifactIDs); err != nil {
-		return err
-	}
-
-	return tx.Commit()
 }
 
 func deleteMissingRows(tx *sql.Tx, table string, ids []string) error {
