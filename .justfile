@@ -18,10 +18,19 @@ lint:
 fmt:
     go fmt ./...
 
+# Verify Go source is formatted
+fmt-check:
+    #!/usr/bin/env sh
+    set -eu
+    files="$(gofmt -l .)"
+    if [ -n "$files" ]; then
+        printf 'Go files are not formatted:\n%s\n' "$files"
+        exit 1
+    fi
+
 install:
   just build
   cp dist/bb ~/.go/bin/bb
 
-
-# Run all verification checks (test + lint)
-check: lint test
+# Run all verification checks
+check: fmt-check lint test
