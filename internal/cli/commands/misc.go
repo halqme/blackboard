@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/halqme/blackboard/internal/cli/commandkit"
-	bbctx "github.com/halqme/blackboard/internal/context"
 	"github.com/halqme/blackboard/internal/config"
+	bbctx "github.com/halqme/blackboard/internal/context"
 	"github.com/halqme/blackboard/internal/fsm"
 	"github.com/halqme/blackboard/internal/store"
 )
@@ -32,10 +32,10 @@ func CmdStatus(args []string, st store.State) error {
 	t := currentTask(st)
 	if commandkit.Has(args, "--json") {
 		payload := map[string]any{
-			"project_id":       st.ProjectID,
-			"revision":         fmt.Sprintf("v%d", st.Revision),
-			"task":             t,
-			"has_active_task":  t != nil,
+			"project_id":      st.ProjectID,
+			"revision":        fmt.Sprintf("v%d", st.Revision),
+			"task":            t,
+			"has_active_task": t != nil,
 		}
 		mergeNoTaskGuidance(payload, t == nil)
 		return commandkit.PrintJSON(payload)

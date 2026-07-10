@@ -49,7 +49,11 @@ func guideCommand() Command {
 }
 
 func statusCommand() Command {
-	return Command{Name: "status", Usage: "bb status [--json]", Abstract: "Show current workflow state", Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmds.CmdStatus(args, st) }) }}
+	return Command{Name: "status", Usage: "bb status [--json]", Abstract: "Show current workflow state", Run: func(args []string) error {
+		return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
+			return cmds.CmdStatus(args, st)
+		})
+	}}
 }
 
 func taskCommand() Command {
@@ -57,15 +61,27 @@ func taskCommand() Command {
 }
 
 func taskNewCommand() Command {
-	return Command{Name: "new", Usage: "bb task new <title>", Abstract: "Create a new task", Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmds.CmdTaskNew(args, s, st) }) }}
+	return Command{Name: "new", Usage: "bb task new <title>", Abstract: "Create a new task", Run: func(args []string) error {
+		return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
+			return cmds.CmdTaskNew(args, s, st)
+		})
+	}}
 }
 
 func nextCommand() Command {
-	return Command{Name: "next", Usage: "bb next [--json]", Abstract: "Show the next valid stage or action", Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmds.CmdNext(args, st) }) }}
+	return Command{Name: "next", Usage: "bb next [--json]", Abstract: "Show the next valid stage or action", Run: func(args []string) error {
+		return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
+			return cmds.CmdNext(args, st)
+		})
+	}}
 }
 
 func contextCommand() Command {
-	return Command{Name: "context", Usage: "bb context [--json]", Abstract: "Show working context (project, task, artifacts)", Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmds.CmdContext(args, root, cfg, st) }) }}
+	return Command{Name: "context", Usage: "bb context [--json]", Abstract: "Show working context (project, task, artifacts)", Run: func(args []string) error {
+		return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
+			return cmds.CmdContext(args, root, cfg, st)
+		})
+	}}
 }
 
 func stageCommand() Command {
@@ -73,7 +89,11 @@ func stageCommand() Command {
 }
 
 func submitCommand() Command {
-	return Command{Name: "submit", Usage: "bb submit <kind> --file <path> --based-on <revision>", Abstract: "Submit an artifact (proposal, impl, etc.)", Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmds.CmdSubmit(args, s, st) }) }}
+	return Command{Name: "submit", Usage: "bb submit <kind> --file <path> --based-on <revision>", Abstract: "Submit an artifact (proposal, impl, etc.)", Run: func(args []string) error {
+		return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
+			return cmds.CmdSubmit(args, s, st)
+		})
+	}}
 }
 
 func artifactCommand() Command {
@@ -81,15 +101,27 @@ func artifactCommand() Command {
 }
 
 func artifactListCommand() Command {
-	return Command{Name: "list", Usage: "bb artifact list [--json]", Abstract: "List all artifacts", Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmds.CmdArtifactList(args, s, st) }) }}
+	return Command{Name: "list", Usage: "bb artifact list [--json]", Abstract: "List all artifacts", Run: func(args []string) error {
+		return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
+			return cmds.CmdArtifactList(args, s, st)
+		})
+	}}
 }
 
 func approveCommand() Command {
-	return Command{Name: "approve", Usage: "bb approve <artifact-id> --based-on <revision>", Abstract: "Approve an artifact", Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmds.CmdApprove(args, s, st) }) }}
+	return Command{Name: "approve", Usage: "bb approve <artifact-id> --based-on <revision>", Abstract: "Approve an artifact", Run: func(args []string) error {
+		return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
+			return cmds.CmdApprove(args, s, st)
+		})
+	}}
 }
 
 func archiveCommand() Command {
-	return Command{Name: "archive", Usage: "bb archive --based-on <revision>", Abstract: "Archive the current task", Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmds.CmdArchive(args, s, st) }) }}
+	return Command{Name: "archive", Usage: "bb archive --based-on <revision>", Abstract: "Archive the current task", Run: func(args []string) error {
+		return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
+			return cmds.CmdArchive(args, s, st)
+		})
+	}}
 }
 
 func writeConfigCommand() Command {
@@ -105,11 +137,19 @@ func installSkillCommand() Command {
 }
 
 func pauseActiveTaskCommand() Command {
-	return Command{Name: "pause-active-task", Usage: "bb pause-active-task", Abstract: "Pause the active task", Hidden: true, Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmds.CmdPauseActiveTask(args, s, st) }) }}
+	return Command{Name: "pause-active-task", Usage: "bb pause-active-task", Abstract: "Pause the active task", Hidden: true, Run: func(args []string) error {
+		return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
+			return cmds.CmdPauseActiveTask(args, s, st)
+		})
+	}}
 }
 
 func createTaskCommand() Command {
-	return Command{Name: "create-task", Usage: "bb create-task <title>", Abstract: "Create a task record", Hidden: true, Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmds.CmdCreateTask(args, s, st) }) }}
+	return Command{Name: "create-task", Usage: "bb create-task <title>", Abstract: "Create a task record", Hidden: true, Run: func(args []string) error {
+		return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
+			return cmds.CmdCreateTask(args, s, st)
+		})
+	}}
 }
 
 func validateSubmitCommand() Command {
@@ -117,9 +157,17 @@ func validateSubmitCommand() Command {
 }
 
 func storeArtifactCommand() Command {
-	return Command{Name: "store-artifact", Usage: "bb store-artifact <kind> --file <path>", Abstract: "Store an artifact record", Hidden: true, Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmds.CmdStoreArtifact(args, s, st) }) }}
+	return Command{Name: "store-artifact", Usage: "bb store-artifact <kind> --file <path>", Abstract: "Store an artifact record", Hidden: true, Run: func(args []string) error {
+		return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
+			return cmds.CmdStoreArtifact(args, s, st)
+		})
+	}}
 }
 
 func advanceTaskStageCommand() Command {
-	return Command{Name: "advance-task-stage", Usage: "bb advance-task-stage <stage>", Abstract: "Advance the active task stage", Hidden: true, Run: func(args []string) error { return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error { return cmds.CmdAdvanceTaskStage(args, s, st) }) }}
+	return Command{Name: "advance-task-stage", Usage: "bb advance-task-stage <stage>", Abstract: "Advance the active task stage", Hidden: true, Run: func(args []string) error {
+		return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
+			return cmds.CmdAdvanceTaskStage(args, s, st)
+		})
+	}}
 }
