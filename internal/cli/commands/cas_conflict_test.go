@@ -13,91 +13,78 @@ import (
 func TestPublicWriteCommandsRejectStaleBasedOnRevision(t *testing.T) {
 	t.Run("submit", func(t *testing.T) {
 		s := newTestStore(t)
-		st := store.State{
-			ProjectID: "proj1",
-			Revision:  1,
-			Tasks: []store.Task{{
+		st := seedTestStore(t, s,
+			[]store.Task{{
 				ID: "task-1", Title: "task", Stage: "intake", Status: "active",
 				CreatedAt: "2026-07-04T00:00:00Z", UpdatedAt: "2026-07-04T00:00:00Z",
 			}},
-		}
-		if err := s.Save(st); err != nil {
-			t.Fatalf("Save() error = %v", err)
-		}
-		advanceRevision(t, s, 1)
+			nil,
+		)
+		advanceRevision(t, s, 2)
 
 		file := filepath.Join(t.TempDir(), "proposal.md")
 		if err := os.WriteFile(file, []byte("# Proposal"), 0o644); err != nil {
 			t.Fatalf("WriteFile() error = %v", err)
 		}
 
-		err := CmdSubmit([]string{"proposal", "--file", file, "--based-on", "v1"}, s, st)
+		err := CmdSubmit([]string{"proposal", "--file", file, "--based-on", "v2"}, s, st)
 		assertLockConflict(t, err)
 
 		got, err := s.Load()
 		if err != nil {
 			t.Fatalf("Load() error = %v", err)
 		}
-		if got.Revision != 2 || len(got.Artifacts) != 0 || got.Tasks[0].Stage != "intake" {
+		if got.Revision != 3 || len(got.Artifacts) != 0 || got.Tasks[0].Stage != "intake" {
 			t.Fatalf("stale submit changed state: %+v", got)
 		}
 	})
 
 	t.Run("approve", func(t *testing.T) {
 		s := newTestStore(t)
-		st := store.State{
-			ProjectID: "proj1",
-			Revision:  1,
-			Tasks: []store.Task{{
+		st := seedTestStore(t, s,
+			[]store.Task{{
 				ID: "task-1", Title: "task", Stage: "proposal", Status: "active",
 				CreatedAt: "2026-07-04T00:00:00Z", UpdatedAt: "2026-07-04T00:00:00Z",
 			}},
-			Artifacts: []store.Artifact{{
+			[]store.Artifact{{
 				ID: "art-1", TaskID: "task-1", Stage: "proposal", Kind: "proposal",
 				Version: 1, Status: "active", BlobHash: "abc123", BasedOnRevision: 1,
 				CreatedAt: "2026-07-04T00:00:00Z",
 			}},
-		}
-		if err := s.Save(st); err != nil {
-			t.Fatalf("Save() error = %v", err)
-		}
-		advanceRevision(t, s, 1)
+		)
+		advanceRevision(t, s, 2)
 
-		err := CmdApprove([]string{"art-1", "--based-on", "v1"}, s, st)
+		err := CmdApprove([]string{"art-1", "--based-on", "v2"}, s, st)
 		assertLockConflict(t, err)
 
 		got, err := s.Load()
 		if err != nil {
 			t.Fatalf("Load() error = %v", err)
 		}
-		if got.Revision != 2 || got.Artifacts[0].Status != "active" {
+		if got.Revision != 3 || got.Artifacts[0].Status != "active" {
 			t.Fatalf("stale approve changed state: %+v", got)
 		}
 	})
 
 	t.Run("archive", func(t *testing.T) {
 		s := newTestStore(t)
-		st := store.State{
-			ProjectID: "proj1",
-			Revision:  1,
-			Tasks: []store.Task{{
+		st := seedTestStore(t, s,
+			[]store.Task{{
 				ID: "task-1", Title: "task", Stage: "proposal", Status: "active",
 				CreatedAt: "2026-07-04T00:00:00Z", UpdatedAt: "2026-07-04T00:00:00Z",
 			}},
-		}
-		if err := s.Save(st); err != nil {
-			t.Fatalf("Save() error = %v", err)
-		}
-		advanceRevision(t, s, 1)
+			nil,
+		)
+		advanceRevision(t, s, 2)
 
-		err := CmdArchive([]string{"--based-on", "v1"}, s, st)
+		err := CmdArchive([]string{"--based-on", "v2"}, s, st)
 		assertLockConflict(t, err)
 
 		got, err := s.Load()
 		if err != nil {
 			t.Fatalf("Load() error = %v", err)
 		}
-		if got.Revision != 2 || got.Tasks[0].Status != "active" || got.Tasks[0].Stage != "proposal" {
+		if got.Revision != 3 || got.Tasks[0].Status != "active" || got.Tasks[0].Stage != "proposal" {
 			t.Fatalf("stale archive changed state: %+v", got)
 		}
 	})
