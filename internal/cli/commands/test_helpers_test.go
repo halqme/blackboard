@@ -22,6 +22,19 @@ func newTestStore(t *testing.T) store.Store {
 	return s
 }
 
+func seedTestStore(t *testing.T, s store.Store, tasks []store.Task, artifacts []store.Artifact) store.State {
+	t.Helper()
+	st, err := s.Update(1, func(st *store.State) error {
+		st.Tasks = append(st.Tasks, tasks...)
+		st.Artifacts = append(st.Artifacts, artifacts...)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	return st
+}
+
 func writeTestProject(t *testing.T, dir, projectID string) {
 	t.Helper()
 	content := "version: 1\nproject:\n  id: " + projectID + "\n  name: Test Project\ncontext:\n  files:\n    - README.md\ncommands:\n  test: \"\"\n"
