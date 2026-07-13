@@ -37,15 +37,16 @@ type Task struct {
 }
 
 type Artifact struct {
-	ID              string `json:"id"`
-	TaskID          string `json:"task_id"`
-	Stage           string `json:"stage"`
-	Kind            string `json:"kind"`
-	Version         int    `json:"version"`
-	Status          string `json:"status"`
-	BlobHash        string `json:"blob_hash"`
-	BasedOnRevision int    `json:"based_on_revision"`
-	CreatedAt       string `json:"created_at"`
+	ID              string   `json:"id"`
+	TaskID          string   `json:"task_id"`
+	Stage           string   `json:"stage"`
+	Kind            string   `json:"kind"`
+	Version         int      `json:"version"`
+	Status          string   `json:"status"`
+	BlobHash        string   `json:"blob_hash"`
+	BasedOnRevision int      `json:"based_on_revision"`
+	CreatedAt       string   `json:"created_at"`
+	DependsOn       []string `json:"depends_on,omitempty"`
 }
 
 type State struct {
@@ -81,7 +82,15 @@ func New(projectID string) Store {
 func (s Store) dbPath() string { return filepath.Join(s.Root, "state.db") }
 
 func (s Store) openDB() (*sql.DB, error) {
-	return sql.Open("sqlite", s.dbPath())
+	db, err := sql.Open("sqlite", s.dbPath())
+	if err != nil {
+		return nil, err
+	}
+	if _, err := db.Exec(`PRAGMA foreign_keys = ON`); err != nil {
+		db.Close()
+		return nil, err
+	}
+	return db, nil
 }
 
 func (s Store) Ensure() error {
@@ -145,6 +154,14 @@ func (s Store) initSchema(db *sql.DB) error {
 			based_on_revision INTEGER NOT NULL,
 			created_at TEXT NOT NULL
 		)`,
+		`CREATE TABLE IF NOT EXISTS artifact_dependencies (
+			artifact_id TEXT NOT NULL,
+			depends_on_artifact_id TEXT NOT NULL,
+			PRIMARY KEY (artifact_id, depends_on_artifact_id),
+			FOREIGN KEY (artifact_id) REFERENCES artifacts(id) ON DELETE CASCADE,
+			FOREIGN KEY (depends_on_artifact_id) REFERENCES artifacts(id) ON DELETE RESTRICT,
+			CHECK (artifact_id <> depends_on_artifact_id)
+		)`,
 	}
 	for _, stmt := range stmts {
 		if _, err := db.Exec(stmt); err != nil {
@@ -197,7 +214,32 @@ func (s Store) Load() (State, error) {
 		}
 		st.Artifacts = append(st.Artifacts, a)
 	}
+	if err := loadDependenciesDB(db, &st); err != nil {
+		return State{}, err
+	}
 	return st, nil
+}
+
+func loadDependenciesDB(db *sql.DB, st *State) error {
+	rows, err := db.Query(`SELECT artifact_id, depends_on_artifact_id FROM artifact_dependencies ORDER BY artifact_id, depends_on_artifact_id`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	byID := make(map[string]*Artifact, len(st.Artifacts))
+	for i := range st.Artifacts {
+		byID[st.Artifacts[i].ID] = &st.Artifacts[i]
+	}
+	for rows.Next() {
+		var artifactID, dependsOn string
+		if err := rows.Scan(&artifactID, &dependsOn); err != nil {
+			return err
+		}
+		if a := byID[artifactID]; a != nil {
+			a.DependsOn = append(a.DependsOn, dependsOn)
+		}
+	}
+	return rows.Err()
 }
 
 func deleteMissingRows(tx *sql.Tx, table string, ids []string) error {
@@ -205,7 +247,6 @@ func deleteMissingRows(tx *sql.Tx, table string, ids []string) error {
 		_, err := tx.Exec("DELETE FROM " + table)
 		return err
 	}
-
 	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
 	args := make([]any, len(ids))
 	for i, id := range ids {
