@@ -19,7 +19,7 @@ func CmdStoreArtifact(args []string, s store.Store, st store.State) error {
 
 	var art store.Artifact
 	_, err := updateState(s, st.Revision, func(current *store.State) error {
-		stored, err := storeArtifact(current, args[0], commandkit.Value(args, "--file"))
+		stored, err := storeArtifact(current, args[0], commandkit.Value(args, "--file"), nil)
 		if err != nil {
 			return err
 		}
