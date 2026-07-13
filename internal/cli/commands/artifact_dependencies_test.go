@@ -38,7 +38,7 @@ func TestSupersedePreviousAndMarkStaleTransitively(t *testing.T) {
 	supersedePreviousAndMarkStale(&st, st.Artifacts[4])
 
 	want := map[string]string{
-		"proposal-v1":   "superseded",
+		"proposal-v1":    "superseded",
 		"implementation": "stale",
 		"verification":   "stale",
 		"unrelated":      "approved",
