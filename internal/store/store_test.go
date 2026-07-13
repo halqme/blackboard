@@ -3,6 +3,7 @@ package store
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -66,7 +67,7 @@ func TestUpdateAndLoadRoundTripThroughSQLite(t *testing.T) {
 	if len(got.Tasks) != 1 || got.Tasks[0] != updated.Tasks[0] {
 		t.Fatalf("Load() tasks = %+v, want %+v", got.Tasks, updated.Tasks)
 	}
-	if len(got.Artifacts) != 1 || got.Artifacts[0] != updated.Artifacts[0] {
+	if len(got.Artifacts) != 1 || !reflect.DeepEqual(got.Artifacts[0], updated.Artifacts[0]) {
 		t.Fatalf("Load() artifacts = %+v, want %+v", got.Artifacts, updated.Artifacts)
 	}
 }
