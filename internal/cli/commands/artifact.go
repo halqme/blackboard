@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/halqme/blackboard/internal/cli/commandkit"
 	"github.com/halqme/blackboard/internal/store"
@@ -12,7 +13,11 @@ func CmdArtifactList(args []string, s store.Store, st store.State) error {
 		return commandkit.PrintJSON(st.Artifacts)
 	}
 	for _, a := range st.Artifacts {
-		fmt.Fprintf(commandkit.Out, "%s %s %s\n", a.ID, a.Kind, a.Status)
+		dependencies := "-"
+		if len(a.DependsOn) > 0 {
+			dependencies = strings.Join(a.DependsOn, ",")
+		}
+		fmt.Fprintf(commandkit.Out, "%s %s %s depends-on=%s\n", a.ID, a.Kind, a.Status, dependencies)
 	}
 	return nil
 }
