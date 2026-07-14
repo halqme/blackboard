@@ -22,7 +22,7 @@ func TestStoreArtifactAppendsArtifact(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 	st := store.State{Revision: 1, Tasks: []store.Task{{ID: "task-1", Stage: "intake", Status: "active"}}}
-	art, err := storeArtifact(&st, "proposal", file)
+	art, err := storeArtifact(&st, "proposal", file, nil)
 	if err != nil {
 		t.Fatalf("storeArtifact() error = %v", err)
 	}

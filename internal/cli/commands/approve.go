@@ -19,10 +19,14 @@ func CmdApprove(args []string, s store.Store, _ store.State) error {
 
 	_, err = updateState(s, expectedRevision, func(st *store.State) error {
 		for i := range st.Artifacts {
-			if st.Artifacts[i].ID == id {
-				st.Artifacts[i].Status = "approved"
-				return nil
+			if st.Artifacts[i].ID != id {
+				continue
 			}
+			if st.Artifacts[i].Status == "stale" {
+				return commandkit.ArtifactValidation("stale artifact cannot be approved: " + id)
+			}
+			st.Artifacts[i].Status = "approved"
+			return nil
 		}
 		return commandkit.ArtifactValidation("artifact not found: " + id)
 	})
