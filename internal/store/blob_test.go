@@ -8,9 +8,8 @@ import (
 )
 
 func TestPutVerifiedBlobAndValidateBlob(t *testing.T) {
-	s := New("proj1")
 	t.Setenv("BLACKBOARD_HOME", t.TempDir())
-	s = New("proj1")
+	s := New("proj1")
 	if err := s.Ensure(); err != nil {
 		t.Fatalf("Ensure() error = %v", err)
 	}
