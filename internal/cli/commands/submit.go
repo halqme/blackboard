@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/halqme/blackboard/internal/cli/commandkit"
 	"github.com/halqme/blackboard/internal/fsm"
@@ -19,16 +18,21 @@ func CmdSubmit(args []string, s store.Store, _ store.State) error {
 		return err
 	}
 	dependsOn := values(args, "--depends-on")
+
+	// Finalize the content-addressed blob before committing the artifact record.
+	// A failed CAS may leave an unreferenced blob, but persisted state can never
+	// point at a missing or partially written blob.
+	blobHash, err := s.PutVerifiedBlob(file)
+	if err != nil {
+		return commandkit.ArtifactValidation(err.Error())
+	}
+
 	var art store.Artifact
 	_, err = updateState(s, expectedRevision, func(st *store.State) error {
 		if err := validateDependencies(*st, dependsOn); err != nil {
 			return err
 		}
-		stored, err := storeArtifact(st, kind, file, dependsOn)
-		if err != nil {
-			return err
-		}
-		art = stored
+		art = storeArtifact(st, kind, blobHash, dependsOn)
 		supersedePreviousAndMarkStale(st, art)
 		advanceTaskStage(st, kind)
 		return nil
@@ -88,17 +92,13 @@ func validateDependencies(st store.State, ids []string) error {
 	return nil
 }
 
-func storeArtifact(st *store.State, kind, file string, dependsOn []string) (store.Artifact, error) {
-	b, err := os.ReadFile(file)
-	if err != nil {
-		return store.Artifact{}, err
-	}
+func storeArtifact(st *store.State, kind, blobHash string, dependsOn []string) store.Artifact {
 	id := store.NewID("art")
 	taskID := currentTaskID(*st)
 	ver := nextArtifactVersion(*st, kind, taskID)
-	art := store.Artifact{ID: id, TaskID: taskID, Stage: currentStage(*st), Kind: kind, Version: ver, Status: "active", BlobHash: fmt.Sprintf("%x", len(b)), BasedOnRevision: st.Revision, CreatedAt: store.Now(), DependsOn: append([]string(nil), dependsOn...)}
+	art := store.Artifact{ID: id, TaskID: taskID, Stage: currentStage(*st), Kind: kind, Version: ver, Status: "active", BlobHash: blobHash, BasedOnRevision: st.Revision, CreatedAt: store.Now(), DependsOn: append([]string(nil), dependsOn...)}
 	st.Artifacts = append(st.Artifacts, art)
-	return art, nil
+	return art
 }
 
 func supersedePreviousAndMarkStale(st *store.State, newest store.Artifact) {
@@ -129,7 +129,6 @@ func supersedePreviousAndMarkStale(st *store.State, newest store.Artifact) {
 					changed = true
 					break
 				}
-			}
 		}
 	}
 }
