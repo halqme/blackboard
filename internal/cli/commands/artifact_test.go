@@ -16,17 +16,9 @@ func TestValidateSubmitArgsParsesInputs(t *testing.T) {
 }
 
 func TestStoreArtifactAppendsArtifact(t *testing.T) {
-	dir := t.TempDir()
-	file := filepath.Join(dir, "proposal.txt")
-	if err := os.WriteFile(file, []byte("proposal body"), 0o644); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
-	}
 	st := store.State{Revision: 1, Tasks: []store.Task{{ID: "task-1", Stage: "intake", Status: "active"}}}
-	art, err := storeArtifact(&st, "proposal", file, nil)
-	if err != nil {
-		t.Fatalf("storeArtifact() error = %v", err)
-	}
-	if len(st.Artifacts) != 1 || art.Kind != "proposal" {
+	art := storeArtifact(&st, "proposal", "blob-hash", nil)
+	if len(st.Artifacts) != 1 || art.Kind != "proposal" || art.BlobHash != "blob-hash" {
 		t.Fatalf("state = %+v art = %+v", st, art)
 	}
 }
@@ -55,6 +47,16 @@ func TestCmdSubmitStoresArtifactAndAdvancesTaskStage(t *testing.T) {
 	}
 	if got.Revision != 3 || got.Tasks[0].Stage != "proposal" || len(got.Artifacts) != 1 {
 		t.Fatalf("state = %+v", got)
+	}
+	if len(got.Artifacts[0].BlobHash) != 64 {
+		t.Fatalf("blob hash = %q, want SHA-256", got.Artifacts[0].BlobHash)
+	}
+	content, err := s.ReadBlob(got.Artifacts[0].BlobHash)
+	if err != nil {
+		t.Fatalf("ReadBlob() error = %v", err)
+	}
+	if content != "proposal body" {
+		t.Fatalf("blob content = %q, want proposal body", content)
 	}
 }
 
