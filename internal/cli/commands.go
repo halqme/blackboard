@@ -97,13 +97,21 @@ func submitCommand() Command {
 }
 
 func artifactCommand() Command {
-	return Command{Name: "artifact", Usage: "bb artifact <subcommand>", Abstract: "Artifact operations", Children: []Command{artifactListCommand()}}
+	return Command{Name: "artifact", Usage: "bb artifact <subcommand>", Abstract: "Artifact operations", Children: []Command{artifactListCommand(), artifactVerifyCommand()}}
 }
 
 func artifactListCommand() Command {
 	return Command{Name: "list", Usage: "bb artifact list [--json]", Abstract: "List all artifacts", Run: func(args []string) error {
 		return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
 			return cmds.CmdArtifactList(args, s, st)
+		})
+	}}
+}
+
+func artifactVerifyCommand() Command {
+	return Command{Name: "verify", Usage: "bb artifact verify [<artifact-id>] [--json]", Abstract: "Verify artifact blob integrity", Run: func(args []string) error {
+		return withProject(func(root string, cfg config.Config, s store.Store, st store.State) error {
+			return cmds.CmdArtifactVerify(args, s, st)
 		})
 	}}
 }
