@@ -29,7 +29,7 @@ func CmdSubmit(args []string, s store.Store, _ store.State) error {
 
 	var art store.Artifact
 	_, err = updateState(s, expectedRevision, func(st *store.State) error {
-		if err := validateDependencies(*st, dependsOn); err != nil {
+		if err := validateDependencies(s, *st, dependsOn); err != nil {
 			return err
 		}
 		art = storeArtifact(st, kind, blobHash, dependsOn)
@@ -70,7 +70,7 @@ func values(args []string, flag string) []string {
 	return out
 }
 
-func validateDependencies(st store.State, ids []string) error {
+func validateDependencies(s store.Store, st store.State, ids []string) error {
 	seen := map[string]bool{}
 	byID := map[string]store.Artifact{}
 	for _, a := range st.Artifacts {
@@ -87,6 +87,9 @@ func validateDependencies(st store.State, ids []string) error {
 		}
 		if a.Status != "approved" {
 			return commandkit.ArtifactValidation("dependency is not approved: " + id)
+		}
+		if _, err := s.ValidateBlob(a.BlobHash); err != nil {
+			return commandkit.ArtifactValidation("dependency blob is invalid: " + id + ": " + err.Error())
 		}
 	}
 	return nil
@@ -129,6 +132,7 @@ func supersedePreviousAndMarkStale(st *store.State, newest store.Artifact) {
 					changed = true
 					break
 				}
+			}
 		}
 	}
 }
