@@ -1,28 +1,39 @@
 package commands
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/halqme/blackboard/internal/store"
 )
 
 func TestValidateDependencies(t *testing.T) {
+	s := newTestStore(t)
+	hash := putTestBlob(t, s, "approved dependency")
 	st := store.State{Artifacts: []store.Artifact{
-		{ID: "approved", Status: "approved"},
-		{ID: "active", Status: "active"},
+		{ID: "approved", Status: "approved", BlobHash: hash},
+		{ID: "active", Status: "active", BlobHash: hash},
 	}}
 
-	if err := validateDependencies(st, []string{"approved"}); err != nil {
+	if err := validateDependencies(s, st, []string{"approved"}); err != nil {
 		t.Fatalf("approved dependency rejected: %v", err)
 	}
-	if err := validateDependencies(st, []string{"missing"}); err == nil {
+	if err := validateDependencies(s, st, []string{"missing"}); err == nil {
 		t.Fatal("missing dependency was accepted")
 	}
-	if err := validateDependencies(st, []string{"active"}); err == nil {
+	if err := validateDependencies(s, st, []string{"active"}); err == nil {
 		t.Fatal("unapproved dependency was accepted")
 	}
-	if err := validateDependencies(st, []string{"approved", "approved"}); err == nil {
+	if err := validateDependencies(s, st, []string{"approved", "approved"}); err == nil {
 		t.Fatal("duplicate dependency was accepted")
+	}
+
+	if err := os.WriteFile(filepath.Join(s.Root, "blobs", hash), []byte("corrupted"), 0o644); err != nil {
+		t.Fatalf("corrupt dependency blob: %v", err)
+	}
+	if err := validateDependencies(s, st, []string{"approved"}); err == nil {
+		t.Fatal("dependency with corrupted blob was accepted")
 	}
 }
 

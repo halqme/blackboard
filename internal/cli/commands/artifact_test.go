@@ -16,17 +16,9 @@ func TestValidateSubmitArgsParsesInputs(t *testing.T) {
 }
 
 func TestStoreArtifactAppendsArtifact(t *testing.T) {
-	dir := t.TempDir()
-	file := filepath.Join(dir, "proposal.txt")
-	if err := os.WriteFile(file, []byte("proposal body"), 0o644); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
-	}
 	st := store.State{Revision: 1, Tasks: []store.Task{{ID: "task-1", Stage: "intake", Status: "active"}}}
-	art, err := storeArtifact(&st, "proposal", file, nil)
-	if err != nil {
-		t.Fatalf("storeArtifact() error = %v", err)
-	}
-	if len(st.Artifacts) != 1 || art.Kind != "proposal" {
+	art := storeArtifact(&st, "proposal", "blob-hash", nil)
+	if len(st.Artifacts) != 1 || art.Kind != "proposal" || art.BlobHash != "blob-hash" {
 		t.Fatalf("state = %+v art = %+v", st, art)
 	}
 }
@@ -56,13 +48,24 @@ func TestCmdSubmitStoresArtifactAndAdvancesTaskStage(t *testing.T) {
 	if got.Revision != 3 || got.Tasks[0].Stage != "proposal" || len(got.Artifacts) != 1 {
 		t.Fatalf("state = %+v", got)
 	}
+	if len(got.Artifacts[0].BlobHash) != 64 {
+		t.Fatalf("blob hash = %q, want SHA-256", got.Artifacts[0].BlobHash)
+	}
+	content, err := s.ReadBlob(got.Artifacts[0].BlobHash)
+	if err != nil {
+		t.Fatalf("ReadBlob() error = %v", err)
+	}
+	if content != "proposal body" {
+		t.Fatalf("blob content = %q, want proposal body", content)
+	}
 }
 
 func TestCmdApproveMarksArtifactApproved(t *testing.T) {
 	s := newTestStore(t)
+	hash := putTestBlob(t, s, "proposal body")
 	st := seedTestStore(t, s,
 		[]store.Task{{ID: "task-1", Title: "task", Stage: "proposal", Status: "active", CreatedAt: "2026-07-04T00:00:00Z", UpdatedAt: "2026-07-04T00:00:00Z"}},
-		[]store.Artifact{{ID: "art-1", TaskID: "task-1", Stage: "proposal", Kind: "proposal", Version: 1, Status: "active", BlobHash: "abc123", BasedOnRevision: 1, CreatedAt: "2026-07-04T00:00:00Z"}},
+		[]store.Artifact{{ID: "art-1", TaskID: "task-1", Stage: "proposal", Kind: "proposal", Version: 1, Status: "active", BlobHash: hash, BasedOnRevision: 1, CreatedAt: "2026-07-04T00:00:00Z"}},
 	)
 	if err := CmdApprove([]string{"art-1", "--based-on", "v2"}, s, st); err != nil {
 		t.Fatalf("CmdApprove() error = %v", err)
@@ -73,6 +76,23 @@ func TestCmdApproveMarksArtifactApproved(t *testing.T) {
 	}
 	if got.Artifacts[0].Status != "approved" {
 		t.Fatalf("artifact status = %q, want approved", got.Artifacts[0].Status)
+	}
+}
+
+func TestCmdApproveRejectsMissingBlob(t *testing.T) {
+	s := newTestStore(t)
+	st := seedTestStore(t, s,
+		[]store.Task{{ID: "task-1", Title: "task", Stage: "proposal", Status: "active", CreatedAt: "2026-07-04T00:00:00Z", UpdatedAt: "2026-07-04T00:00:00Z"}},
+		[]store.Artifact{{ID: "art-1", TaskID: "task-1", Stage: "proposal", Kind: "proposal", Version: 1, Status: "active", BlobHash: "missing", BasedOnRevision: 1, CreatedAt: "2026-07-04T00:00:00Z"}},
+	)
+	err := CmdApprove([]string{"art-1", "--based-on", "v2"}, s, st)
+	assertArtifactValidationExit(t, err)
+	got, loadErr := s.Load()
+	if loadErr != nil {
+		t.Fatalf("Load() error = %v", loadErr)
+	}
+	if got.Revision != 2 || got.Artifacts[0].Status != "active" {
+		t.Fatalf("invalid approval changed state: %+v", got)
 	}
 }
 

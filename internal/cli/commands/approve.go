@@ -25,6 +25,9 @@ func CmdApprove(args []string, s store.Store, _ store.State) error {
 			if st.Artifacts[i].Status == "stale" {
 				return commandkit.ArtifactValidation("stale artifact cannot be approved: " + id)
 			}
+			if _, err := s.ValidateBlob(st.Artifacts[i].BlobHash); err != nil {
+				return commandkit.ArtifactValidation("artifact blob is invalid: " + id + ": " + err.Error())
+			}
 			st.Artifacts[i].Status = "approved"
 			return nil
 		}
